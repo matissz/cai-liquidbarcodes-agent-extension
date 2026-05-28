@@ -1,0 +1,81 @@
+import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
+import { makeAgentApiRequest } from '../utils/httpClient';
+import { extractApiError } from '../utils/extractApiError';
+import type { IOtpStartResponse } from '../types/agentApi';
+
+export const authOtpStartNode = createNodeDescriptor({
+  type: "authOtpStart",
+  defaultLabel: "Start OTP",
+  summary: "Send OTP code via SMS to a phone number",
+
+  fields: [
+    {
+      key: "connection",
+      label: "Connection",
+      type: "connection",
+      params: { connectionType: "liquid-barcodes-agent-api", required: true },
+    },
+    {
+      key: "phone",
+      label: "Phone Number",
+      type: "cognigyText",
+      params: { required: true },
+      description: "Digits only, country code included, no leading +. Example: 34111111111",
+    },
+    {
+      key: "contextKey",
+      label: "Store Result In",
+      type: "cognigyText",
+      defaultValue: "liquidBarcodesAgent.otpStart",
+      params: { required: true },
+    },
+  ],
+
+  sections: [
+    {
+      key: "otpRequest",
+      label: "OTP Request",
+      defaultCollapsed: false,
+      fields: ["connection", "phone"],
+    },
+    {
+      key: "output",
+      label: "Output Settings",
+      defaultCollapsed: true,
+      fields: ["contextKey"],
+    },
+  ],
+
+  form: [
+    { type: "section", key: "otpRequest" },
+    { type: "section", key: "output" },
+  ],
+
+  function: async ({ cognigy, config }: INodeFunctionBaseParams) => {
+    const { api } = cognigy;
+    const { connection, phone, contextKey } = config as any;
+
+    try {
+      const response = await makeAgentApiRequest<IOtpStartResponse>({
+        method: 'POST',
+        baseUrl: connection.baseUrl,
+        path: '/v1/auth/otp/start',
+        apiKey: connection.apiKey,
+        signatureSalt: connection.signatureSalt,
+        signatureFields: [phone],
+        body: { phone },
+      });
+
+      const result = {
+        phone: response.data.Phone,
+      };
+
+      api.addToContext?.(contextKey, result, 'simple');
+      api.log?.('info', 'OTP start succeeded');
+    } catch (error: any) {
+      const apiError = extractApiError(error);
+      api.log?.('error', `OTP start failed: ${apiError.message}`);
+      api.addToContext?.(contextKey, { error: apiError }, 'simple');
+    }
+  },
+});
