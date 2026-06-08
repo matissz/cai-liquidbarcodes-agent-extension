@@ -4,3 +4,5 @@ build/
 .DS_Store
 .env
 *.tgz
+TASKS.md
+EMAIL_WIP_UPDATE.md
