@@ -290,15 +290,19 @@ Third-party cookies are blocked by default in Safari (ITP), Chrome (Storage Part
 
 These questions affect flow design and should be clarified before production deployment:
 
-1. **User registration:** Does the OTP flow only work for already-registered LB users, or does it auto-register new users on first verify?
-2. **Registration endpoint:** Is there a separate user registration API endpoint that should be called before OTP for new users?
-3. **Phone uniqueness:** Can a single phone number be associated with multiple LB users?
-4. **Phone number changes:** If a user changes their phone number, does their UserId remain valid? How is the new phone linked?
-5. **UserId validation:** Is there a lightweight way to check if a UserId is still valid before attempting SSO token generation (to avoid unnecessary errors)?
-6. **Token lifetime:** Are access token lifetimes (ExpiresInSeconds) consistent, or can they vary? Should the flow cache and reuse tokens within a conversation?
-7. **Cross-device identity:** When a returning user switches to a new device (no stored session), OTP by phone is the only re-verification method available. Is there an alternative mechanism for cross-device identity beyond phone OTP (e.g., email-based verification, a user lookup endpoint by phone/email that doesn't require an access token)?
-8. **User lookup without auth:** Is there an endpoint to check if a phone number or email is associated with an existing LB user before initiating the OTP flow? This would allow the chatbot to distinguish between new and returning users upfront.
-9. **Phone-only identity risk:** Currently, phone number + SMS OTP is the sole method for identifying and authenticating a user in the chatbot flow. Once authenticated, the chatbot can access the full user profile (name, email, subscriptions, payment methods, receipts) and the UserId is stored for future SSO sessions. If a phone number is compromised (SIM swap, number recycling, social engineering), an attacker could gain access to the user's loyalty account and personal data through the chatbot. Is there a secondary verification factor available (e.g., email confirmation, PIN, security question) that can be combined with phone OTP to strengthen user identity verification, especially for sensitive operations like viewing payment methods or receipts?
+1. **New-user registration:** Does OTP auto-register a new user on first verify, or must a separate registration endpoint be called first? (Covers both "does OTP only work for existing users" and "is there a registration API".)
+
+2. **Phone number as identity:** Can one phone number map to multiple users? And if a user changes their phone number, does their UserId stay valid, and how is the new phone linked?
+
+3. **User lookup / validation without auth:** Is there an endpoint to look up or validate a user by phone, email, or UserId *without* an access token? This one capability would let the flow (a) tell new vs. returning users apart upfront, (b) confirm a stored UserId is still valid before attempting SSO, and (c) re-identify a returning user on a new device without relying solely on phone OTP.
+
+4. **Token lifetime & refresh:** Is `ExpiresInSeconds` consistent or variable? Should the flow cache and reuse a token within a conversation, and is any refresh mechanism available (currently there is none)?
+
+5. **Second identity factor (security):** Phone + SMS OTP is currently the *only* identity check, yet an authenticated session exposes the full profile (name, email, subscriptions, payment methods, receipts) and stores the UserId for future SSO. If a number is compromised (SIM swap, recycling, social engineering) an attacker could reach the account. Is a second factor (email confirmation, PIN, security question) available — especially for sensitive operations like payment methods, receipts, or cancelling a subscription?
+
+6. **Write-operation behavior:** What exactly do the action endpoints do — does **Cancel Subscription** apply immediately or at next renewal, and does **Issue Coupon** return (or make retrievable) the actual coupon/wash code? (The endpoints currently return only success/failure, no data.)
+
+7. **API contract details:** What are the rate limits (undocumented so far), and which JSON casing is authoritative in production? The sandbox returns camelCase while the API reference examples use PascalCase.
 
 ---
 
