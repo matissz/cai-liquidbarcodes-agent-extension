@@ -6,6 +6,12 @@ import { getUserNode } from '../nodes/getUser';
 import { getStoresNode } from '../nodes/getStores';
 import { getStoresMachinesStatusNode } from '../nodes/getStoresMachinesStatus';
 import { getReceiptsNode } from '../nodes/getReceipts';
+import { cancelSubscriptionNode } from '../nodes/cancelSubscription';
+import { getSubscriptionUsersNode } from '../nodes/getSubscriptionUsers';
+import { addSubscriptionUserNode } from '../nodes/addSubscriptionUser';
+import { removeSubscriptionUserNode } from '../nodes/removeSubscriptionUser';
+import { setPlateNumberNode } from '../nodes/setPlateNumber';
+import { issueCouponNode } from '../nodes/issueCoupon';
 import { agentApiConnection } from '../connections/agentApiConnection';
 
 const ALL_NODES = [
@@ -17,16 +23,22 @@ const ALL_NODES = [
   getStoresNode,
   getStoresMachinesStatusNode,
   getReceiptsNode,
+  cancelSubscriptionNode,
+  getSubscriptionUsersNode,
+  addSubscriptionUserNode,
+  removeSubscriptionUserNode,
+  setPlateNumberNode,
+  issueCouponNode,
 ];
 
 describe('Extension structure', () => {
-  test('all 8 nodes are defined', () => {
-    expect(ALL_NODES).toHaveLength(8);
+  test('all 14 nodes are defined', () => {
+    expect(ALL_NODES).toHaveLength(14);
   });
 
   test('all nodes have unique types', () => {
     const types = ALL_NODES.map(n => n.type);
-    expect(new Set(types).size).toBe(8);
+    expect(new Set(types).size).toBe(14);
   });
 
   test('all nodes have a defaultLabel', () => {

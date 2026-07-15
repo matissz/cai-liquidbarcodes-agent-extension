@@ -6,3 +6,4 @@ build/
 *.tgz
 TASKS.md
 EMAIL_WIP_UPDATE.md
+coverage/

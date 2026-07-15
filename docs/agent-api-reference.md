@@ -6,6 +6,11 @@
 
 > Production URL is provided separately by Liquid Barcodes for your environment.
 
+> **Response casing note (observed 2026-07):** the sandbox currently returns JSON response
+> bodies in **camelCase** (e.g. `accessToken`, `userId`, `plateNumber`), whereas the response
+> examples in this document use PascalCase. Request bodies are camelCase in both. Confirm the
+> authoritative production casing with Liquid Barcodes; consumers should not assume PascalCase.
+
 ---
 
 ## Authentication & Request Signing
@@ -466,6 +471,127 @@ Retrieve user receipts. Optional `storeId` and `dateFrom` filters. May be slow -
 
 ---
 
+### Subscriptions
+
+#### POST `/v1/subscriptions/cancel` -- Cancel Subscription
+
+Cancel a user's subscription. Requires `Authorization: Bearer` token. Cancellation timing
+(immediate vs. next renewal) should be confirmed with Liquid Barcodes.
+
+**Signature construction:** `timestamp` + `subscriptionId` + `signatureSalt`
+
+**Request Body** (`application/json`):
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `subscriptionId` | integer (int64) | Yes | The SubscriptionId to cancel (from `GET /v1/user`). |
+
+**Response 200:** `OK` (no documented body).
+
+**Error responses:** [400](#error-response-400), [401](#error-response-401)
+
+---
+
+#### GET `/v1/subscriptions/{subscriptionId}/users` -- Get Subscription Users
+
+List the users (family members) on a multi-user subscription. Requires `Authorization: Bearer`.
+
+**Signature construction:** `timestamp` + `subscriptionId` + `signatureSalt`
+
+**Path parameters:** `subscriptionId` (integer int64, required).
+
+**Response 200:** list of subscription users.
+
+**Error responses:** [400](#error-response-400), [401](#error-response-401)
+
+---
+
+#### POST `/v1/subscriptions/{subscriptionId}/users` -- Add Subscription User
+
+Add a user (family member) to a multi-user subscription (owner only, up to `MaxUsersAmount`).
+Requires `Authorization: Bearer`.
+
+**Signature construction:** `timestamp` + `subscriptionId` + `personalIdentifier` + `signatureSalt`
+
+**Path parameters:** `subscriptionId` (integer int64, required).
+
+**Request Body** (`application/json`):
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `personalIdentifier` | string | Yes | Identifier of the user to add (e.g. phone number). |
+
+**Response 200:** `OK` (no documented body).
+
+**Error responses:** [400](#error-response-400), [401](#error-response-401)
+
+---
+
+#### DELETE `/v1/subscriptions/{subscriptionId}/users/{id}` -- Remove Subscription User
+
+Remove a user (family member) from a multi-user subscription. Requires `Authorization: Bearer`.
+
+**Signature construction:** `timestamp` + `subscriptionId` + `id` + `signatureSalt`
+
+**Path parameters:** `subscriptionId` (integer int64, required), `id` (integer int64, required --
+the subscription user's Id from Get Subscription Users).
+
+**Response 200:** `OK` (no documented body).
+
+**Error responses:** [400](#error-response-400), [401](#error-response-401)
+
+---
+
+### User Profile Updates
+
+#### PUT `/v1/user/plate-number` -- Set Plate Number
+
+Update the signed-in user's license plate number. Requires `Authorization: Bearer`.
+
+**Signature construction:** `timestamp` + `plateNumber` + `signatureSalt`
+
+**Request Body** (`application/json`):
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `plateNumber` | string | Yes | The new license plate number. |
+
+**Response 200:** `OK` (no documented body).
+
+> The Agent API also exposes granular profile-update endpoints not yet wrapped as nodes:
+> `PATCH /v1/user`, `PATCH /v1/user/name`, `PATCH /v1/user/address`,
+> `PUT /v1/user/{gender|culture|date-of-birth|emails|preferred-stores|default-payment-method}`,
+> and `POST|DELETE /v1/user/{consents|groups}/{id}`.
+
+**Error responses:** [400](#error-response-400), [401](#error-response-401)
+
+---
+
+### Coupons
+
+#### POST `/v1/coupons/issue` -- Issue Coupon
+
+Issue a coupon (e.g. a single wash code) to the signed-in user. Requires `Authorization: Bearer`.
+Confirm `scheduleId` selection for a single car wash with Liquid Barcodes.
+
+**Signature construction:** `timestamp` + `scheduleId` + `expirationDate?` + `transactionId?` + `signatureSalt`
+
+> Omit absent optional values from the concatenation (same rule as the data endpoints).
+
+**Request Body** (`application/json`):
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `scheduleId` | integer (int32) | Yes | The coupon schedule ID to issue (provided by Liquid Barcodes). |
+| `expirationDate` | string (date-time) | No | Expiration date/time for the issued coupon. |
+| `transactionId` | string | No | Caller-supplied transaction reference. |
+
+**Response 200:** `OK` (no documented body).
+
+**Error responses:** [400](#error-response-400), [401](#error-response-401)
+
+---
+
 ## Data Models
 
 ### User Model
@@ -753,5 +879,14 @@ Returned on **400** and **401** responses across all endpoints.
 | `GET /v1/stores` | `timestamp` + `storeId` + `salt` |
 | `GET /v1/stores/machines/status` | `timestamp` + `lastUpdateTime` + `salt` |
 | `GET /v1/receipts` | `timestamp` + `storeId` + `dateFrom` + `salt` |
+| `POST /v1/subscriptions/cancel` | `timestamp` + `subscriptionId` + `salt` |
+| `GET /v1/subscriptions/{id}/users` | `timestamp` + `subscriptionId` + `salt` |
+| `POST /v1/subscriptions/{id}/users` | `timestamp` + `subscriptionId` + `personalIdentifier` + `salt` |
+| `DELETE /v1/subscriptions/{id}/users/{userId}` | `timestamp` + `subscriptionId` + `userId` + `salt` |
+| `PUT /v1/user/plate-number` | `timestamp` + `plateNumber` + `salt` |
+| `POST /v1/coupons/issue` | `timestamp` + `scheduleId` + `expirationDate` + `transactionId` + `salt` |
 
 > For all signatures: trim each part, concatenate with **no** separators, UTF-8 encode, SHA-256 hash, output as lowercase hex. Omit absent optional values from the concatenation.
+>
+> The signature orders for the six write endpoints above were **verified against the sandbox**
+> (each returns a non-`INVALID_SIGNATURE` response). See `src/__tests__/integration.test.ts`.

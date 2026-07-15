@@ -316,6 +316,119 @@ describeIntegration('Integration: Liquid Barcodes Agent API (sandbox)', () => {
     });
   });
 
+  // ── Section 3b: Phase 1 write endpoints — signature verification ─────────
+  // Confirms the INFERRED signature field order for each new endpoint is
+  // accepted by the sandbox (i.e. never returns 401 INVALID_SIGNATURE).
+  // Uses non-existent IDs so no real data is mutated; plate-number is verified
+  // read-modify-restore against the durable test user.
+
+  const describeWrites = HAS_DURABLE_SSO ? describe : describe.skip;
+
+  describeWrites('Phase 1 write endpoints (signature verification)', () => {
+    let accessToken: string;
+
+    beforeAll(async () => {
+      const headers = makeHeaders([TEST_SSO_TOKEN!]);
+      const res = await axios.post(`${BASE_URL}/v1/auth/sso`, { ssoToken: TEST_SSO_TOKEN }, { headers });
+      // Sandbox currently returns camelCase; accept either casing.
+      accessToken = res.data.accessToken ?? res.data.AccessToken;
+    });
+
+    // Asserts the signature was accepted — any response other than a
+    // 401 INVALID_SIGNATURE means the field order is correct.
+    async function expectSignatureAccepted(fn: () => Promise<any>) {
+      try {
+        const res = await fn();
+        expect([200, 201, 204]).toContain(res.status);
+      } catch (error: any) {
+        expect(error.response).toBeDefined();
+        expect(error.response.data?.code).not.toBe('INVALID_SIGNATURE');
+      }
+    }
+
+    const FAKE_SUBSCRIPTION_ID = '999999999';
+
+    test('POST /v1/subscriptions/cancel — signature accepted (timestamp+subscriptionId+salt)', async () => {
+      await expectSignatureAccepted(() =>
+        axios.post(
+          `${BASE_URL}/v1/subscriptions/cancel`,
+          { subscriptionId: Number(FAKE_SUBSCRIPTION_ID) },
+          { headers: makeHeaders([FAKE_SUBSCRIPTION_ID], accessToken) }
+        )
+      );
+    });
+
+    test('GET /v1/subscriptions/{id}/users — signature accepted (timestamp+subscriptionId+salt)', async () => {
+      await expectSignatureAccepted(() =>
+        axios.get(
+          `${BASE_URL}/v1/subscriptions/${FAKE_SUBSCRIPTION_ID}/users`,
+          { headers: makeHeaders([FAKE_SUBSCRIPTION_ID], accessToken) }
+        )
+      );
+    });
+
+    test('POST /v1/subscriptions/{id}/users — signature accepted (timestamp+subscriptionId+personalIdentifier+salt)', async () => {
+      const personalIdentifier = '000000000';
+      await expectSignatureAccepted(() =>
+        axios.post(
+          `${BASE_URL}/v1/subscriptions/${FAKE_SUBSCRIPTION_ID}/users`,
+          { personalIdentifier },
+          { headers: makeHeaders([FAKE_SUBSCRIPTION_ID, personalIdentifier], accessToken) }
+        )
+      );
+    });
+
+    test('DELETE /v1/subscriptions/{id}/users/{userId} — signature accepted (timestamp+subscriptionId+userId+salt)', async () => {
+      const userId = '999999999';
+      await expectSignatureAccepted(() =>
+        axios.delete(
+          `${BASE_URL}/v1/subscriptions/${FAKE_SUBSCRIPTION_ID}/users/${userId}`,
+          { headers: makeHeaders([FAKE_SUBSCRIPTION_ID, userId], accessToken) }
+        )
+      );
+    });
+
+    test('POST /v1/coupons/issue — signature accepted (timestamp+scheduleId+salt)', async () => {
+      const scheduleId = '999999999';
+      await expectSignatureAccepted(() =>
+        axios.post(
+          `${BASE_URL}/v1/coupons/issue`,
+          { scheduleId: Number(scheduleId) },
+          { headers: makeHeaders([scheduleId], accessToken) }
+        )
+      );
+    });
+
+    test('PUT /v1/user/plate-number — signature accepted (timestamp+plateNumber+salt), restored after', async () => {
+      // Read current plate so we can restore it.
+      const userRes = await axios.get(`${BASE_URL}/v1/user`, { headers: makeHeaders([], accessToken) });
+      const plate = userRes.data?.plateNumber ?? userRes.data?.PlateNumber;
+      const originalPlate: string | undefined = plate?.plateNumber ?? plate?.PlateNumber;
+      const testPlate = 'LBTEST123';
+
+      await expectSignatureAccepted(() =>
+        axios.put(
+          `${BASE_URL}/v1/user/plate-number`,
+          { plateNumber: testPlate },
+          { headers: makeHeaders([testPlate], accessToken) }
+        )
+      );
+
+      // Restore the original plate (best-effort; ignore failures).
+      if (originalPlate) {
+        try {
+          await axios.put(
+            `${BASE_URL}/v1/user/plate-number`,
+            { plateNumber: originalPlate },
+            { headers: makeHeaders([originalPlate], accessToken) }
+          );
+        } catch {
+          /* best-effort restore */
+        }
+      }
+    });
+  });
+
   // ── Section 4: App API — SSO Token Generation ────────────────────────────
 
   const describeAppApi = HAS_APP_CREDS ? describe : describe.skip;

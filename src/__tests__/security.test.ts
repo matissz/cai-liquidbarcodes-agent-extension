@@ -8,6 +8,12 @@ import { getUserNode } from '../nodes/getUser';
 import { getStoresNode } from '../nodes/getStores';
 import { getStoresMachinesStatusNode } from '../nodes/getStoresMachinesStatus';
 import { getReceiptsNode } from '../nodes/getReceipts';
+import { cancelSubscriptionNode } from '../nodes/cancelSubscription';
+import { getSubscriptionUsersNode } from '../nodes/getSubscriptionUsers';
+import { addSubscriptionUserNode } from '../nodes/addSubscriptionUser';
+import { removeSubscriptionUserNode } from '../nodes/removeSubscriptionUser';
+import { setPlateNumberNode } from '../nodes/setPlateNumber';
+import { issueCouponNode } from '../nodes/issueCoupon';
 import { createMockParams, getNodeFunction } from './helpers';
 
 let mock: MockAdapter;
@@ -56,7 +62,16 @@ describe('Security: signatureSalt never leaks', () => {
     { node: getReceiptsNode, config: { connection, accessToken: 'at', storeId: '', dateFrom: '', contextKey: 'k' } },
   ];
 
-  const ALL = [...APP_API_NODES, ...AUTH_NODES, ...DATA_NODES];
+  const WRITE_NODES = [
+    { node: cancelSubscriptionNode, config: { connection, accessToken: 'at', subscriptionId: '1', contextKey: 'k' } },
+    { node: getSubscriptionUsersNode, config: { connection, accessToken: 'at', subscriptionId: '1', contextKey: 'k' } },
+    { node: addSubscriptionUserNode, config: { connection, accessToken: 'at', subscriptionId: '1', personalIdentifier: '123', contextKey: 'k' } },
+    { node: removeSubscriptionUserNode, config: { connection, accessToken: 'at', subscriptionId: '1', userId: '2', contextKey: 'k' } },
+    { node: setPlateNumberNode, config: { connection, accessToken: 'at', plateNumber: 'ABC123', contextKey: 'k' } },
+    { node: issueCouponNode, config: { connection, accessToken: 'at', scheduleId: '1', expirationDate: '', transactionId: '', contextKey: 'k' } },
+  ];
+
+  const ALL = [...APP_API_NODES, ...AUTH_NODES, ...DATA_NODES, ...WRITE_NODES];
 
   test.each(ALL.map(n => [n.node.type, n]))('%s: signatureSalt not in context', async (_type, { node, config }) => {
     const execute = getNodeFunction(node);
@@ -84,7 +99,13 @@ describe('Security: signatureSalt never leaks', () => {
     const { params } = createMockParams(config);
     await execute(params);
 
-    const history = [...mock.history.post, ...mock.history.get];
+    const history = [
+      ...mock.history.post,
+      ...mock.history.get,
+      ...mock.history.put,
+      ...mock.history.patch,
+      ...mock.history.delete,
+    ];
     for (const req of history) {
       expect(JSON.stringify(req.headers)).not.toContain(SALT);
       if (req.data) {
@@ -344,6 +365,30 @@ describe('Security: header integrity', () => {
       await execute(params);
 
       const history = mock.history.get;
+      expect(history.length).toBeGreaterThan(0);
+      expect(history[0].headers!['X-Liquid-Signature']).toMatch(/^[0-9a-f]{64}$/);
+      expect(history[0].headers!['X-Liquid-Timestamp']).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      expect(history[0].headers!['X-Customer-Api-Key']).toBe(API_KEY);
+      expect(history[0].headers!['Authorization']).toBe('Bearer at');
+    }
+  });
+
+  test('write nodes send signature headers AND Authorization Bearer', async () => {
+    const writeNodes = [
+      { node: cancelSubscriptionNode, config: { connection, accessToken: 'at', subscriptionId: '1', contextKey: 'k' } },
+      { node: addSubscriptionUserNode, config: { connection, accessToken: 'at', subscriptionId: '1', personalIdentifier: '123', contextKey: 'k' } },
+      { node: removeSubscriptionUserNode, config: { connection, accessToken: 'at', subscriptionId: '1', userId: '2', contextKey: 'k' } },
+      { node: setPlateNumberNode, config: { connection, accessToken: 'at', plateNumber: 'ABC123', contextKey: 'k' } },
+      { node: issueCouponNode, config: { connection, accessToken: 'at', scheduleId: '1', expirationDate: '', transactionId: '', contextKey: 'k' } },
+    ];
+
+    for (const { node, config } of writeNodes) {
+      mock.resetHistory();
+      const execute = getNodeFunction(node);
+      const { params } = createMockParams(config);
+      await execute(params);
+
+      const history = [...mock.history.post, ...mock.history.put, ...mock.history.patch, ...mock.history.delete];
       expect(history.length).toBeGreaterThan(0);
       expect(history[0].headers!['X-Liquid-Signature']).toMatch(/^[0-9a-f]{64}$/);
       expect(history[0].headers!['X-Liquid-Timestamp']).toMatch(/^\d{4}-\d{2}-\d{2}T/);

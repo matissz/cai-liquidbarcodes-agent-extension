@@ -30,7 +30,8 @@ export async function makeAgentApiRequest<T = any>(
     headers['Authorization'] = `Bearer ${accessToken}`;
   }
 
-  if (method === 'POST') {
+  const sendsBody = method === 'POST' || method === 'PUT' || method === 'PATCH';
+  if (sendsBody) {
     headers['Content-Type'] = 'application/json';
   }
 
@@ -40,7 +41,7 @@ export async function makeAgentApiRequest<T = any>(
     method,
     url,
     headers,
-    data: method === 'POST' ? body : undefined,
+    data: sendsBody ? body : undefined,
     params: queryParams,
   });
 

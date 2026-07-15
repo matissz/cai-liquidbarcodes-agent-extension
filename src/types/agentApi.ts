@@ -190,6 +190,47 @@ export interface IReceiptsResponse {
   Receipts: IReceipt[];
 }
 
+// ── Subscription management ──
+
+export interface ICancelSubscriptionRequest {
+  subscriptionId: number;
+}
+
+export interface ISubscriptionUser {
+  Id?: number;
+  PersonalIdentifier?: string;
+  Name?: string;
+  [key: string]: any;
+}
+
+export interface ISubscriptionUsersResponse {
+  Users?: ISubscriptionUser[];
+  [key: string]: any;
+}
+
+export interface IAddSubscriptionUserRequest {
+  personalIdentifier: string;
+}
+
+// ── Profile updates ──
+
+export interface ISetPlateNumberRequest {
+  plateNumber: string;
+}
+
+// ── Coupons ──
+
+export interface IIssueCouponRequest {
+  scheduleId: number;
+  expirationDate?: string;
+  transactionId?: string;
+}
+
+/** Endpoints that return `200 OK` with no documented response body. */
+export interface IWriteOperationResult {
+  [key: string]: any;
+}
+
 // ── Error ──
 
 export interface IApiProblemDetails {
@@ -205,7 +246,7 @@ export interface IApiProblemDetails {
 // ── HTTP Client ──
 
 export interface IAgentApiRequestOptions {
-  method: 'GET' | 'POST';
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   baseUrl: string;
   path: string;
   apiKey: string;

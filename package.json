@@ -14,7 +14,9 @@
     "watch": "webpack --watch",
     "pack:cognigy": "webpack --mode production && node scripts/pack.js",
     "test": "jest",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:coverage:detailed": "jest --coverage --verbose --testPathIgnorePatterns=integration.test.ts",
+    "test:ci": "jest --coverage --ci --testPathIgnorePatterns=integration.test.ts"
   },
   "keywords": [
     "cognigy",
