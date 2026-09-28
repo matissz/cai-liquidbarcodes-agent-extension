@@ -90,8 +90,9 @@ export const getStoresNode = createNodeDescriptor({
         log: (level, message) => api.log?.(level, message),
       });
 
+      const stores = response.data.stores ?? response.data.Stores ?? [];
       api.addToContext?.(contextKey, response.data, 'simple');
-      api.log?.('info', `Get stores succeeded (${response.data.Stores?.length ?? 0} stores)`);
+      api.log?.('info', `Get stores succeeded (${stores.length} stores)`);
     } catch (error: any) {
       const apiError = extractApiError(error);
       api.log?.('error', `Get stores failed: ${apiError.message}`);

@@ -155,6 +155,27 @@ describe('getReceipts node (GET /v1/receipts)', () => {
     expect(contextStore['lb.receipts'].Receipts).toHaveLength(1);
   });
 
+  test('stores camelCase response and logs the correct receipt count', async () => {
+    const camelCaseResponse = {
+      logo: 'https://url.to.company.logo.jpg',
+      receipts: [{ receiptId: 'r-1', format: 'Liquid/1.0' }],
+    };
+    mock.onGet(new RegExp(`${TEST_CONNECTION.baseUrl}/v1/receipts`)).reply(200, camelCaseResponse);
+
+    const { params, contextStore, logs } = createMockParams({
+      connection: TEST_CONNECTION,
+      accessToken: 'tok',
+      storeId: '',
+      dateFrom: '',
+      contextKey: 'lb.receipts',
+    });
+
+    await execute(params);
+
+    expect(contextStore['lb.receipts']).toEqual(camelCaseResponse);
+    expect(logs.some(log => log.message === 'Get receipts succeeded (1 receipts)')).toBe(true);
+  });
+
   test('handles API error', async () => {
     mock.onGet(new RegExp(`${TEST_CONNECTION.baseUrl}/v1/receipts`)).reply(401, {
       detail: 'Authentication failed.',

@@ -69,8 +69,8 @@ export const authSsoNode = createNodeDescriptor({
       });
 
       const result = {
-        accessToken: response.data.AccessToken,
-        expiresInSeconds: response.data.ExpiresInSeconds,
+        accessToken: response.data.accessToken ?? response.data.AccessToken,
+        expiresInSeconds: response.data.expiresInSeconds ?? response.data.ExpiresInSeconds,
       };
 
       api.addToContext?.(contextKey, result, 'simple');

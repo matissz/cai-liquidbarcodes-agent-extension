@@ -77,6 +77,26 @@ describe('requestSsoToken node (POST /auth/lb/tokens)', () => {
     });
   });
 
+  test('stores camelCase token and expirationDate in context', async () => {
+    mock.onPost(`${TEST_CONNECTION.appBaseUrl}/auth/lb/tokens`).reply(200, {
+      token: 'camel-sso-token',
+      expirationDate: '2026-02-15T10:00:00Z',
+    });
+
+    const { params, contextStore } = createMockParams({
+      connection: TEST_CONNECTION,
+      userId: 'user-789',
+      contextKey: 'lb.ssoToken',
+    });
+
+    await execute(params);
+
+    expect(contextStore['lb.ssoToken']).toEqual({
+      token: 'camel-sso-token',
+      expirationDate: '2026-02-15T10:00:00Z',
+    });
+  });
+
   test('does NOT send X-Customer-Api-Key header', async () => {
     mock.onPost(`${TEST_CONNECTION.appBaseUrl}/auth/lb/tokens`).reply(200, {
       Token: 'tok',

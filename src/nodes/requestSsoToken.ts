@@ -96,17 +96,17 @@ export const requestSsoTokenNode = createNodeDescriptor({
       }));
 
       const result = {
-        token: response.data.Token,
-        expirationDate: response.data.ExpirationDate,
+        token: response.data.token ?? response.data.Token,
+        expirationDate: response.data.expirationDate ?? response.data.ExpirationDate,
       };
 
       api.addToContext?.(contextKey, result, 'simple');
       api.log?.('info', 'SSO token request succeeded');
     } catch (error: any) {
       const data = error?.response?.data;
-      const rs = data?.ResponseStatus;
-      const message = rs?.Message || data?.detail || error?.message || 'Unknown error';
-      const code = rs?.ErrorCode || data?.code;
+      const rs = data?.responseStatus ?? data?.ResponseStatus;
+      const message = rs?.message ?? rs?.Message ?? data?.detail ?? error?.message ?? 'Unknown error';
+      const code = rs?.errorCode ?? rs?.ErrorCode ?? data?.code;
 
       api.log?.('error', JSON.stringify({
         event: 'lb.appResponse.failed',

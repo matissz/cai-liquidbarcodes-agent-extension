@@ -77,6 +77,26 @@ describe('authSso node (POST /v1/auth/sso)', () => {
     });
   });
 
+  test('stores camelCase accessToken and expiresInSeconds in context', async () => {
+    mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/sso`).reply(200, {
+      accessToken: 'camel-tok',
+      expiresInSeconds: 3600,
+    });
+
+    const { params, contextStore } = createMockParams({
+      connection: TEST_CONNECTION,
+      ssoToken: 'token1',
+      contextKey: 'lb.session',
+    });
+
+    await execute(params);
+
+    expect(contextStore['lb.session']).toEqual({
+      accessToken: 'camel-tok',
+      expiresInSeconds: 3600,
+    });
+  });
+
   test('sends X-Customer-Api-Key header', async () => {
     mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/sso`).reply(200, {
       AccessToken: 'tok',

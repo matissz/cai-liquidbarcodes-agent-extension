@@ -5,8 +5,10 @@ export interface ISsoTokenRequest {
 }
 
 export interface ISsoTokenResponse {
-  Token: string;
-  ExpirationDate: string;
+  Token?: string;
+  token?: string;
+  ExpirationDate?: string;
+  expirationDate?: string;
 }
 
 export interface ISsoRequest {
@@ -14,8 +16,10 @@ export interface ISsoRequest {
 }
 
 export interface ISsoResponse {
-  AccessToken: string;
-  ExpiresInSeconds: number;
+  AccessToken?: string;
+  accessToken?: string;
+  ExpiresInSeconds?: number;
+  expiresInSeconds?: number;
 }
 
 export interface IOtpStartRequest {
@@ -158,7 +162,8 @@ export interface IStore {
 }
 
 export interface IStoresResponse {
-  Stores: IStore[];
+  Stores?: IStore[];
+  stores?: IStore[];
 }
 
 export interface IStoreMachine {
@@ -177,7 +182,8 @@ export interface IStoreMachineStatus {
 }
 
 export interface IStoreMachinesStatusResponse {
-  StoreMachinesStatus: IStoreMachineStatus[];
+  StoreMachinesStatus?: IStoreMachineStatus[];
+  storeMachinesStatus?: IStoreMachineStatus[];
 }
 
 // ── Receipts ──
@@ -189,8 +195,10 @@ export interface IReceipt {
 }
 
 export interface IReceiptsResponse {
-  Logo: string;
-  Receipts: IReceipt[];
+  Logo?: string;
+  logo?: string;
+  Receipts?: IReceipt[];
+  receipts?: IReceipt[];
 }
 
 // ── Subscription management ──
@@ -208,6 +216,7 @@ export interface ISubscriptionUser {
 
 export interface ISubscriptionUsersResponse {
   Users?: ISubscriptionUser[];
+  users?: ISubscriptionUser[];
   [key: string]: any;
 }
 

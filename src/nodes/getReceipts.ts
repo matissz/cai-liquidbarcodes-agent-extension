@@ -100,8 +100,9 @@ export const getReceiptsNode = createNodeDescriptor({
         log: (level, message) => api.log?.(level, message),
       });
 
+      const receipts = response.data.receipts ?? response.data.Receipts ?? [];
       api.addToContext?.(contextKey, response.data, 'simple');
-      api.log?.('info', `Get receipts succeeded (${response.data.Receipts?.length ?? 0} receipts)`);
+      api.log?.('info', `Get receipts succeeded (${receipts.length} receipts)`);
     } catch (error: any) {
       const apiError = extractApiError(error);
       api.log?.('error', `Get receipts failed: ${apiError.message}`);
