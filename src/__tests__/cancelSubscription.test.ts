@@ -97,6 +97,35 @@ describe('cancelSubscription node (POST /v1/subscriptions/cancel)', () => {
     expect(contextStore['lb.cancel'].success).toBe(true);
   });
 
+  test('logs every cancellation step without exposing credentials', async () => {
+    mock.onPost(new RegExp(`${TEST_CONNECTION.baseUrl}/v1/subscriptions/cancel`)).reply(200, {});
+
+    const { params, logs } = createMockParams({
+      connection: TEST_CONNECTION,
+      accessToken: 'secret-bearer-token',
+      subscriptionId: '53848',
+      contextKey: 'lb.cancel',
+    });
+
+    await execute(params);
+
+    const output = logs.map(entry => entry.message).join('\n');
+    for (const event of [
+      'lb.cancel.started',
+      'lb.cancel.callingApi',
+      'lb.request.prepared',
+      'lb.request.sending',
+      'lb.response.received',
+      'lb.cancel.apiSucceeded',
+      'lb.cancel.contextStored',
+    ]) {
+      expect(output).toContain(event);
+    }
+    expect(output).not.toContain(TEST_CONNECTION.apiKey);
+    expect(output).not.toContain(TEST_CONNECTION.signatureSalt);
+    expect(output).not.toContain('secret-bearer-token');
+  });
+
   test('handles API error', async () => {
     mock.onPost(new RegExp(`${TEST_CONNECTION.baseUrl}/v1/subscriptions/cancel`)).reply(400, {
       detail: 'Validation failed.',
@@ -113,5 +142,30 @@ describe('cancelSubscription node (POST /v1/subscriptions/cancel)', () => {
     await execute(params);
 
     expect(contextStore['lb.cancel'].error).toBeDefined();
+  });
+
+  test('logs API failure details and trace ID', async () => {
+    mock.onPost(new RegExp(`${TEST_CONNECTION.baseUrl}/v1/subscriptions/cancel`)).reply(401, {
+      detail: 'The request could not be authenticated.',
+      code: 'AuthenticationFailed',
+      status: 401,
+      traceId: '00-cancel-trace-01',
+    });
+
+    const { params, logs } = createMockParams({
+      connection: TEST_CONNECTION,
+      accessToken: 'secret-bearer-token',
+      subscriptionId: '53848',
+      contextKey: 'lb.cancel',
+    });
+
+    await execute(params);
+
+    const output = logs.map(entry => entry.message).join('\n');
+    expect(output).toContain('lb.response.failed');
+    expect(output).toContain('lb.cancel.apiFailed');
+    expect(output).toContain('AuthenticationFailed');
+    expect(output).toContain('00-cancel-trace-01');
+    expect(output).not.toContain('secret-bearer-token');
   });
 });

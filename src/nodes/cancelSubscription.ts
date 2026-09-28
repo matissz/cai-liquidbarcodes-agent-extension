@@ -69,25 +69,67 @@ export const cancelSubscriptionNode = createNodeDescriptor({
   function: async ({ cognigy, config }: INodeFunctionBaseParams) => {
     const { api } = cognigy;
     const { connection, accessToken, subscriptionId, contextKey } = config as any;
+    const normalizedSubscriptionId = String(subscriptionId ?? '').trim();
+    const numericSubscriptionId = Number(normalizedSubscriptionId);
+
+    api.log?.('info', JSON.stringify({
+      event: 'lb.cancel.started',
+      baseUrl: String(connection?.baseUrl ?? '').trim().replace(/\/+$/, ''),
+      apiKeyPresent: String(connection?.apiKey ?? '').trim().length > 0,
+      apiKeyLength: String(connection?.apiKey ?? '').trim().length,
+      signatureSaltPresent: String(connection?.signatureSalt ?? '').trim().length > 0,
+      signatureSaltLength: String(connection?.signatureSalt ?? '').trim().length,
+      accessTokenPresent: String(accessToken ?? '').trim().length > 0,
+      subscriptionId: normalizedSubscriptionId,
+      subscriptionIdValid: Number.isSafeInteger(numericSubscriptionId) && numericSubscriptionId > 0,
+      contextKey,
+    }));
 
     try {
+      api.log?.('info', JSON.stringify({
+        event: 'lb.cancel.callingApi',
+        subscriptionId: normalizedSubscriptionId,
+      }));
+
       const response = await makeAgentApiRequest<IWriteOperationResult>({
         method: 'POST',
         baseUrl: connection.baseUrl,
         path: '/v1/subscriptions/cancel',
         apiKey: connection.apiKey,
         signatureSalt: connection.signatureSalt,
-        signatureFields: [String(subscriptionId ?? '')],
+        signatureFields: [normalizedSubscriptionId],
         accessToken,
-        body: { subscriptionId: Number(subscriptionId) },
+        body: { subscriptionId: numericSubscriptionId },
+        log: (level, message) => api.log?.(level, message),
       });
 
+      api.log?.('info', JSON.stringify({
+        event: 'lb.cancel.apiSucceeded',
+        status: response.status,
+        subscriptionId: normalizedSubscriptionId,
+      }));
       api.addToContext?.(contextKey, { success: true, data: response.data ?? null }, 'simple');
-      api.log?.('info', 'Cancel subscription succeeded');
+      api.log?.('info', JSON.stringify({
+        event: 'lb.cancel.contextStored',
+        contextKey,
+        success: true,
+      }));
     } catch (error: any) {
       const apiError = extractApiError(error);
-      api.log?.('error', `Cancel subscription failed: ${apiError.message}`);
+      api.log?.('error', JSON.stringify({
+        event: 'lb.cancel.apiFailed',
+        subscriptionId: normalizedSubscriptionId,
+        status: apiError.status,
+        code: apiError.code,
+        message: apiError.message,
+        traceId: apiError.traceId,
+      }));
       api.addToContext?.(contextKey, { error: apiError }, 'simple');
+      api.log?.('info', JSON.stringify({
+        event: 'lb.cancel.contextStored',
+        contextKey,
+        success: false,
+      }));
     }
   },
 });

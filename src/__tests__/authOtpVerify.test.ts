@@ -81,6 +81,27 @@ describe('authOtpVerify node (POST /v1/auth/otp/verify)', () => {
     });
   });
 
+  test('stores camelCase sandbox token response in context', async () => {
+    mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/otp/verify`).reply(200, {
+      accessToken: 'tok-camel-case',
+      expiresInSeconds: 1800,
+    });
+
+    const { params, contextStore } = createMockParams({
+      connection: TEST_CONNECTION,
+      phone: '34111111111',
+      code: '3565',
+      contextKey: 'lb.session',
+    });
+
+    await execute(params);
+
+    expect(contextStore['lb.session']).toEqual({
+      accessToken: 'tok-camel-case',
+      expiresInSeconds: 1800,
+    });
+  });
+
   test('does NOT send Authorization header', async () => {
     mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/otp/verify`).reply(200, {
       AccessToken: 'tok',

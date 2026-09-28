@@ -23,7 +23,8 @@ export interface IOtpStartRequest {
 }
 
 export interface IOtpStartResponse {
-  Phone: string;
+  Phone?: string;
+  phone?: string;
 }
 
 export interface IOtpVerifyRequest {
@@ -32,8 +33,10 @@ export interface IOtpVerifyRequest {
 }
 
 export interface IOtpVerifyResponse {
-  AccessToken: string;
-  ExpiresInSeconds: number;
+  AccessToken?: string;
+  accessToken?: string;
+  ExpiresInSeconds?: number;
+  expiresInSeconds?: number;
 }
 
 // ── User ──
@@ -255,6 +258,7 @@ export interface IAgentApiRequestOptions {
   accessToken?: string;
   body?: Record<string, any>;
   queryParams?: Record<string, string>;
+  log?: (level: 'info' | 'error', message: string) => void;
 }
 
 export interface IAgentApiResponse<T = any> {

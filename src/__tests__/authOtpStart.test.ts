@@ -71,6 +71,22 @@ describe('authOtpStart node (POST /v1/auth/otp/start)', () => {
     expect(contextStore['lb.otp']).toEqual({ phone: '34111111111' });
   });
 
+  test('stores camelCase sandbox phone response in context', async () => {
+    mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/otp/start`).reply(200, {
+      phone: '34111111111',
+    });
+
+    const { params, contextStore } = createMockParams({
+      connection: TEST_CONNECTION,
+      phone: '34111111111',
+      contextKey: 'lb.otp',
+    });
+
+    await execute(params);
+
+    expect(contextStore['lb.otp']).toEqual({ phone: '34111111111' });
+  });
+
   test('does NOT send Authorization header', async () => {
     mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/otp/start`).reply(200, { Phone: '123' });
 

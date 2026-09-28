@@ -54,6 +54,7 @@ export const authOtpStartNode = createNodeDescriptor({
   function: async ({ cognigy, config }: INodeFunctionBaseParams) => {
     const { api } = cognigy;
     const { connection, phone, contextKey } = config as any;
+    const normalizedPhone = String(phone ?? '').trim();
 
     try {
       const response = await makeAgentApiRequest<IOtpStartResponse>({
@@ -62,12 +63,13 @@ export const authOtpStartNode = createNodeDescriptor({
         path: '/v1/auth/otp/start',
         apiKey: connection.apiKey,
         signatureSalt: connection.signatureSalt,
-        signatureFields: [phone],
-        body: { phone },
+        signatureFields: [normalizedPhone],
+        body: { phone: normalizedPhone },
+        log: (level, message) => api.log?.(level, message),
       });
 
       const result = {
-        phone: response.data.Phone,
+        phone: response.data.phone ?? response.data.Phone ?? normalizedPhone,
       };
 
       api.addToContext?.(contextKey, result, 'simple');

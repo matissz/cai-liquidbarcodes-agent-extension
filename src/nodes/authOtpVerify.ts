@@ -61,6 +61,8 @@ export const authOtpVerifyNode = createNodeDescriptor({
   function: async ({ cognigy, config }: INodeFunctionBaseParams) => {
     const { api } = cognigy;
     const { connection, phone, code, contextKey } = config as any;
+    const normalizedPhone = String(phone ?? '').trim();
+    const normalizedCode = String(code ?? '').trim();
 
     try {
       const response = await makeAgentApiRequest<IOtpVerifyResponse>({
@@ -69,13 +71,14 @@ export const authOtpVerifyNode = createNodeDescriptor({
         path: '/v1/auth/otp/verify',
         apiKey: connection.apiKey,
         signatureSalt: connection.signatureSalt,
-        signatureFields: [phone, code],
-        body: { phone, code },
+        signatureFields: [normalizedPhone, normalizedCode],
+        body: { phone: normalizedPhone, code: normalizedCode },
+        log: (level, message) => api.log?.(level, message),
       });
 
       const result = {
-        accessToken: response.data.AccessToken,
-        expiresInSeconds: response.data.ExpiresInSeconds,
+        accessToken: response.data.accessToken ?? response.data.AccessToken,
+        expiresInSeconds: response.data.expiresInSeconds ?? response.data.ExpiresInSeconds,
       };
 
       api.addToContext?.(contextKey, result, 'simple');
