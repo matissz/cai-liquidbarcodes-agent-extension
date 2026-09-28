@@ -87,6 +87,7 @@ export const addSubscriptionUserNode = createNodeDescriptor({
         signatureFields: [String(subscriptionId ?? ''), personalIdentifier],
         accessToken,
         body: { personalIdentifier },
+        log: (level, message) => api.log?.(level, message),
       });
 
       api.addToContext?.(contextKey, { success: true, data: response.data ?? null }, 'simple');

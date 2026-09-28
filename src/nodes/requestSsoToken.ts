@@ -54,19 +54,46 @@ export const requestSsoTokenNode = createNodeDescriptor({
   function: async ({ cognigy, config }: INodeFunctionBaseParams) => {
     const { api } = cognigy;
     const { connection, userId, contextKey } = config as any;
+    const normalizedAppBaseUrl = String(connection?.appBaseUrl ?? '').trim().replace(/\/+$/, '');
+    const normalizedAppSecretKey = String(connection?.appSecretKey ?? '').trim();
+    const normalizedUserId = String(userId ?? '').trim();
+    const url = `${normalizedAppBaseUrl}/auth/lb/tokens`;
 
     try {
       const timestamp = new Date().toISOString();
-      const signature = computeSignature(timestamp, [userId], connection.appSecretKey);
+      const signature = computeSignature(timestamp, [normalizedUserId], normalizedAppSecretKey);
 
-      const url = `${connection.appBaseUrl}/auth/lb/tokens`;
       const headers: Record<string, string> = {
         'X-Liquid-Timestamp': timestamp,
         'X-Liquid-Signature': signature,
         'Content-Type': 'application/json',
       };
 
-      const response = await axios.post<ISsoTokenResponse>(url, { UserId: userId }, { headers });
+      api.log?.('info', JSON.stringify({
+        event: 'lb.appRequest.prepared',
+        method: 'POST',
+        url,
+        timestamp,
+        appSecretKeyPresent: normalizedAppSecretKey.length > 0,
+        appSecretKeyLength: normalizedAppSecretKey.length,
+        userIdLength: normalizedUserId.length,
+        signatureLength: signature.length,
+      }));
+      api.log?.('info', JSON.stringify({
+        event: 'lb.appRequest.sending',
+        method: 'POST',
+        url,
+        headerNames: Object.keys(headers),
+      }));
+
+      const response = await axios.post<ISsoTokenResponse>(url, { UserId: normalizedUserId }, { headers });
+
+      api.log?.('info', JSON.stringify({
+        event: 'lb.appResponse.received',
+        method: 'POST',
+        url,
+        status: response.status,
+      }));
 
       const result = {
         token: response.data.Token,
@@ -81,7 +108,15 @@ export const requestSsoTokenNode = createNodeDescriptor({
       const message = rs?.Message || data?.detail || error?.message || 'Unknown error';
       const code = rs?.ErrorCode || data?.code;
 
-      api.log?.('error', `SSO token request failed: ${message}`);
+      api.log?.('error', JSON.stringify({
+        event: 'lb.appResponse.failed',
+        method: 'POST',
+        url,
+        status: error?.response?.status,
+        code,
+        message,
+        traceId: data?.traceId,
+      }));
       api.addToContext?.(contextKey, { error: { message, code, status: error?.response?.status } }, 'simple');
     }
   },

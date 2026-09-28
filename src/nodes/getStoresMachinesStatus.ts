@@ -87,6 +87,7 @@ export const getStoresMachinesStatusNode = createNodeDescriptor({
         signatureFields,
         accessToken,
         queryParams: Object.keys(queryParams).length > 0 ? queryParams : undefined,
+        log: (level, message) => api.log?.(level, message),
       });
 
       api.addToContext?.(contextKey, response.data, 'simple');

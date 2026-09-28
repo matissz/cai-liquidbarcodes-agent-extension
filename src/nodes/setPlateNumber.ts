@@ -80,6 +80,7 @@ export const setPlateNumberNode = createNodeDescriptor({
         signatureFields: [plateNumber],
         accessToken,
         body: { plateNumber },
+        log: (level, message) => api.log?.(level, message),
       });
 
       api.addToContext?.(contextKey, { success: true, data: response.data ?? null }, 'simple');

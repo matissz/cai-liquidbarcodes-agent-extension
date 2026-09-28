@@ -104,6 +104,7 @@ export const issueCouponNode = createNodeDescriptor({
         signatureFields,
         accessToken,
         body: body as unknown as Record<string, any>,
+        log: (level, message) => api.log?.(level, message),
       });
 
       api.addToContext?.(contextKey, { success: true, data: response.data ?? null }, 'simple');

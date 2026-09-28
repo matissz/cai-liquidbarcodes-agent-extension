@@ -129,6 +129,35 @@ describe('requestSsoToken node (POST /auth/lb/tokens)', () => {
     expect(mock.history.post[0].headers!['X-Liquid-Timestamp']).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
+  test('logs sanitized App API request lifecycle events', async () => {
+    const appSecretKey = 'secret-that-must-not-be-logged';
+    const userId = 'user-that-must-not-be-logged';
+    const token = 'token-that-must-not-be-logged';
+    const connection = { ...TEST_CONNECTION, appSecretKey };
+
+    mock.onPost(`${TEST_CONNECTION.appBaseUrl}/auth/lb/tokens`).reply(200, {
+      Token: token,
+      ExpirationDate: '2026-01-27T15:25:36Z',
+    });
+
+    const { params, logs } = createMockParams({
+      connection,
+      userId,
+      contextKey: 'lb.ssoToken',
+    });
+
+    await execute(params);
+
+    const serializedLogs = JSON.stringify(logs);
+    expect(serializedLogs).toContain('lb.appRequest.prepared');
+    expect(serializedLogs).toContain('lb.appRequest.sending');
+    expect(serializedLogs).toContain('lb.appResponse.received');
+    expect(serializedLogs).not.toContain(appSecretKey);
+    expect(serializedLogs).not.toContain(userId);
+    expect(serializedLogs).not.toContain(token);
+    expect(serializedLogs).not.toContain(mock.history.post[0].headers!['X-Liquid-Signature'] as string);
+  });
+
   test('handles App API error (ResponseStatus format)', async () => {
     mock.onPost(`${TEST_CONNECTION.appBaseUrl}/auth/lb/tokens`).reply(400, {
       ResponseStatus: {

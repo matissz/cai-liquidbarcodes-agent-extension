@@ -79,6 +79,7 @@ export const getSubscriptionUsersNode = createNodeDescriptor({
         signatureSalt: connection.signatureSalt,
         signatureFields: [String(subscriptionId ?? '')],
         accessToken,
+        log: (level, message) => api.log?.(level, message),
       });
 
       api.addToContext?.(contextKey, response.data, 'simple');

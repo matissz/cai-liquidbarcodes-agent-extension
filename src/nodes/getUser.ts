@@ -65,6 +65,7 @@ export const getUserNode = createNodeDescriptor({
         signatureSalt: connection.signatureSalt,
         signatureFields: [],
         accessToken,
+        log: (level, message) => api.log?.(level, message),
       });
 
       api.addToContext?.(contextKey, response.data, 'simple');

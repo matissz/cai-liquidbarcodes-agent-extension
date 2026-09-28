@@ -86,6 +86,7 @@ export const removeSubscriptionUserNode = createNodeDescriptor({
         signatureSalt: connection.signatureSalt,
         signatureFields: [String(subscriptionId ?? ''), String(userId ?? '')],
         accessToken,
+        log: (level, message) => api.log?.(level, message),
       });
 
       api.addToContext?.(contextKey, { success: true, data: response.data ?? null }, 'simple');

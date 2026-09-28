@@ -65,6 +65,7 @@ export const authSsoNode = createNodeDescriptor({
         signatureSalt: connection.signatureSalt,
         signatureFields: [ssoToken],
         body: { ssoToken },
+        log: (level, message) => api.log?.(level, message),
       });
 
       const result = {
