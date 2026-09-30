@@ -13,6 +13,7 @@ export function createMockApi() {
     }),
     say: jest.fn(),
     output: jest.fn(),
+    setNextNode: jest.fn(),
     setContext: jest.fn(),
     getContext: jest.fn(),
     deleteContext: jest.fn(),
@@ -22,7 +23,7 @@ export function createMockApi() {
   return { api, contextStore, logs };
 }
 
-export function createMockParams(config: Record<string, any>) {
+export function createMockParams(config: Record<string, any>, childConfigs: INodeFunctionBaseParams['childConfigs'] = []) {
   const { api, contextStore, logs } = createMockApi();
 
   const params: INodeFunctionBaseParams = {
@@ -33,7 +34,7 @@ export function createMockParams(config: Record<string, any>) {
       profile: {},
     } as any,
     config: config as any,
-    childConfigs: [],
+    childConfigs,
     nodeId: 'test-node-id',
   };
 

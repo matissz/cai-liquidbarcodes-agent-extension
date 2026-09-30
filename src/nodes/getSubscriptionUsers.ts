@@ -1,12 +1,16 @@
 import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
 import { makeAgentApiRequest } from '../utils/httpClient';
 import { extractApiError } from '../utils/extractApiError';
+import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
+import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { ISubscriptionUsersResponse } from '../types/agentApi';
 
 export const getSubscriptionUsersNode = createNodeDescriptor({
   type: "getSubscriptionUsers",
   defaultLabel: "Get Subscription Users",
   summary: "List the users (family members) on a multi-user subscription",
+  constraints: RESULT_CHILD_CONSTRAINTS,
+  dependencies: RESULT_CHILD_DEPENDENCIES,
 
   fields: [
     {
@@ -66,9 +70,10 @@ export const getSubscriptionUsersNode = createNodeDescriptor({
     { type: "section", key: "output" },
   ],
 
-  function: async ({ cognigy, config }: INodeFunctionBaseParams) => {
+  function: async ({ cognigy, config, childConfigs }: INodeFunctionBaseParams) => {
     const { api } = cognigy;
     const { connection, accessToken, subscriptionId, contextKey } = config as any;
+    let route: ResultRoute = 'error';
 
     try {
       const response = await makeAgentApiRequest<ISubscriptionUsersResponse>({
@@ -84,10 +89,13 @@ export const getSubscriptionUsersNode = createNodeDescriptor({
 
       api.addToContext?.(contextKey, response.data, 'simple');
       api.log?.('info', 'Get subscription users succeeded');
+      route = 'success';
     } catch (error: any) {
       const apiError = extractApiError(error);
       api.log?.('error', `Get subscription users failed: ${apiError.message}`);
       api.addToContext?.(contextKey, { error: apiError }, 'simple');
     }
+
+    routeToResultChild(childConfigs, api, route);
   },
 });

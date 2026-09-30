@@ -96,7 +96,7 @@ describe('getUser node (GET /v1/user)', () => {
     ['SessionInvalid', 1004, 401],
     ['InsufficientScope', 1005, 403],
   ])('preserves %s protected-session error', async (code, errorCode, status) => {
-    mock.onGet(`${TEST_CONNECTION.baseUrl}/v1/user`).reply(401, {
+    mock.onGet(`${TEST_CONNECTION.baseUrl}/v1/user`).reply(status, {
       detail: 'Protected request failed.',
       code,
       errorCode,

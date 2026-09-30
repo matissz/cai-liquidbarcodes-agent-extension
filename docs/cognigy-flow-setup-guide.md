@@ -9,7 +9,7 @@ This guide consolidates the implementation details and sandbox findings verified
 1. The live sandbox returns response properties in **camelCase**, although older API examples use PascalCase.
 2. Authentication nodes normalize their output to camelCase, such as `accessToken` and `expiresInSeconds`.
 3. Read nodes store the Liquid Barcodes response body unchanged. Use the property names visible in the Cognigy context. For the live sandbox, use camelCase paths.
-4. Every node stores an error in its configured context destination instead of stopping the flow. Add an error check after every extension node.
+4. Every API node provides built-in **On Success** and **On Error** children. It also stores its response or normalized error in the configured context destination before routing.
 5. A `subscriptionId` identifies the whole subscription. A subscription member `id` identifies one member. They are not interchangeable.
 6. Adding or removing members requires the **subscription owner's access token** and a multi-user subscription.
 7. Cancel Subscription cancels the whole subscription and affects the owner and all members. The current extension has no reactivation operation.
@@ -152,7 +152,7 @@ Successful write operations store:
 }
 ```
 
-The API may return an object instead of an empty body, in which case that body is placed in `data`. Always check `error` first and `success` second.
+The API may return an object instead of an empty body, in which case that body is placed in `data`. Connect the **On Success** child for normal processing and the **On Error** child for recovery. The stored `success`, `data`, and `error` values remain available for diagnostics and business decisions.
 
 ## 5. Recommended Authentication Flows
 
@@ -161,13 +161,13 @@ The API may return an object instead of an empty body, in which case that body i
 ```text
 Question: phone number
   -> Start OTP
-  -> IF otpStart.error: explain and stop/retry
-  -> Question: SMS code
+  On Error -> explain and stop/retry
+  On Success -> Question: SMS code
   -> Verify OTP
-  -> IF session.error: explain and retry/restart
-  -> Get User Profile
-  -> IF user.error: explain and stop
-  -> Save user.userId to a persistent Cognigy contact profile or CRM
+  On Error -> explain and retry/restart
+  On Success -> Get User Profile
+  On Error -> explain and stop
+  On Success -> Save user.userId to a persistent Cognigy contact profile or CRM
 ```
 
 Suggested values:
@@ -186,10 +186,10 @@ Use a stable Cognigy contact identity if the chat is embedded in an iframe. Do n
 ```text
 Read saved Liquid Barcodes user ID
   -> Request SSO Token
-  -> IF ssoToken.error: fall back to OTP or stop
-  -> Exchange SSO Token
-  -> IF session.error: request a fresh SSO token or fall back to OTP
-  -> Get User Profile
+     On Error -> fall back to OTP or stop
+     On Success -> Exchange SSO Token
+        On Error -> request a fresh SSO token or fall back to OTP
+        On Success -> Get User Profile
 ```
 
 An SSO token is one-time use. Do not cache and exchange the same SSO token again.
@@ -216,8 +216,8 @@ Authenticate owner
   -> Ask for member phone/personal identifier
   -> Confirm member and subscription with owner
   -> Add Subscription User
-  -> Check addSubscriptionUser.error
-  -> On success, Get Subscription Users again
+      On Error -> explain the stored error
+      On Success -> Get Subscription Users again
 ```
 
 Required values:
@@ -240,8 +240,8 @@ Authenticate owner
   -> Present members and select one
   -> Confirm removal with owner
   -> Remove Subscription User
-  -> Check removeSubscriptionUser.error
-  -> On success, Get Subscription Users again
+      On Error -> explain the stored error
+      On Success -> Get Subscription Users again
 ```
 
 Required values:
@@ -263,8 +263,8 @@ Authenticate user
   -> Show plan and impact
   -> Require explicit confirmation
   -> Cancel Subscription
-  -> Check cancelSubscription.error
-  -> On success, Get User Profile again
+      On Error -> explain the stored error
+      On Success -> Get User Profile again
 ```
 
 **Destructive-operation warning:** Cancel Subscription acts on the subscription ID and affects the owner and all attached members. The current extension provides no undo or reactivation node. Cancellation timing, including whether it is immediate or effective at renewal, must be confirmed with Liquid Barcodes before production use.
@@ -276,10 +276,10 @@ Authenticate user
 ```text
 Authenticate
   -> Get Stores (leave Store ID blank)
-  -> Check stores.error
-  -> Get Machine Status
-  -> Check machineStatus.error
-  -> Match each machine-status storeId to a store id
+     On Error -> handle store lookup failure
+     On Success -> Get Machine Status
+        On Error -> handle status lookup failure
+        On Success -> Match each machine-status storeId to a store id
 ```
 
 Live camelCase example:
@@ -296,7 +296,8 @@ The machine-status response is also stored unchanged. Inspect whether the curren
 Authenticate
   -> Optional: Get Stores and select a store
   -> Get Receipts with optional Store ID and Date From
-  -> Check receipts.error
+  On Error -> handle receipt lookup failure
+  On Success -> present receipts
 ```
 
 The receipt collection is available under `receipts` in the live camelCase response. The nested receipt payload may itself be a serialized text value and may require a Cognigy Code node before individual line items can be used.
@@ -309,9 +310,14 @@ Ask for the plate, validate and normalize it according to the business rules, co
 
 Authenticate the recipient, supply a Schedule ID obtained from Liquid Barcodes, and optionally supply an expiration date and transaction reference. A successful call confirms issuance but the current endpoint does not provide the resulting wash/coupon code in the documented response.
 
-## 8. Error Handling Required After Every Node
+## 8. Built-in Success and Error Routing
 
-Failures are stored in the selected context destination and the Cognigy flow continues. A typical failure is:
+Each API node automatically selects one of its two child paths after storing context:
+
+- **On Success** is selected after a valid API response has been stored.
+- **On Error** is selected after a normalized error has been stored.
+
+A typical failure context is:
 
 ```json
 {
@@ -323,7 +329,7 @@ Failures are stored in the selected context destination and the Cognigy flow con
 }
 ```
 
-Add an IF node after each call and check the matching path:
+Connect both children in the flow. Inside **On Error**, these paths remain available for detailed recovery, user messaging, and trace correlation:
 
 | Extension node | Error expression |
 | --- | --- |
@@ -351,7 +357,9 @@ Common handling:
 | `404` | Incorrect subscription, member, store, user, or schedule identifier | Refresh source data and let the user select again |
 | `409` or business-rule error | Duplicate member, member limit, invalid subscription state, or similar conflict | Explain the returned message and refresh account data |
 
-Do not expose raw backend errors or identifiers to end users. Use the error object for branching and log correlation, then show a suitable business-facing message.
+Do not expose raw backend errors or identifiers to end users. Use the Error child for control flow and the stored error object for classification and log correlation, then show a suitable business-facing message.
+
+Older flow instances created before these children were introduced may not receive them automatically. In that case the node logs a warning and preserves its previous linear successor behavior until the node is recreated or its children are added in Cognigy.
 
 ## 9. Diagnostics and Safe Logging
 
@@ -375,7 +383,7 @@ A successful HTTP `200` plus data in context means the node succeeded even if an
 - [ ] All five connection values are supplied by Liquid Barcodes and belong to the same sandbox or production environment.
 - [ ] No credentials or user tokens are hard-coded in flow nodes.
 - [ ] The flow uses camelCase paths verified from the target environment's context.
-- [ ] Every extension node is followed by an error branch.
+- [ ] Every extension node has both built-in On Success and On Error children connected and handled.
 - [ ] Access-token expiry causes re-authentication; there is no automatic refresh.
 - [ ] SSO tokens are requested fresh and exchanged only once.
 - [ ] Phone values contain country code and digits only, without `+`.

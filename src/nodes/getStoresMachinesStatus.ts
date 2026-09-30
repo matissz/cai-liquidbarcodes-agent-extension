@@ -1,12 +1,16 @@
 import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
 import { makeAgentApiRequest } from '../utils/httpClient';
 import { extractApiError } from '../utils/extractApiError';
+import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
+import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { IStoreMachinesStatusResponse } from '../types/agentApi';
 
 export const getStoresMachinesStatusNode = createNodeDescriptor({
   type: "getStoresMachinesStatus",
   defaultLabel: "Get Machine Status",
   summary: "Retrieve machine statuses for all stores",
+  constraints: RESULT_CHILD_CONSTRAINTS,
+  dependencies: RESULT_CHILD_DEPENDENCIES,
 
   fields: [
     {
@@ -65,9 +69,10 @@ export const getStoresMachinesStatusNode = createNodeDescriptor({
     { type: "section", key: "output" },
   ],
 
-  function: async ({ cognigy, config }: INodeFunctionBaseParams) => {
+  function: async ({ cognigy, config, childConfigs }: INodeFunctionBaseParams) => {
     const { api } = cognigy;
     const { connection, accessToken, lastUpdateTime, contextKey } = config as any;
+    let route: ResultRoute = 'error';
 
     try {
       const signatureFields: string[] = [];
@@ -92,10 +97,13 @@ export const getStoresMachinesStatusNode = createNodeDescriptor({
 
       api.addToContext?.(contextKey, response.data, 'simple');
       api.log?.('info', 'Get machine status succeeded');
+      route = 'success';
     } catch (error: any) {
       const apiError = extractApiError(error);
       api.log?.('error', `Get machine status failed: ${apiError.message}`);
       api.addToContext?.(contextKey, { error: apiError }, 'simple');
     }
+
+    routeToResultChild(childConfigs, api, route);
   },
 });

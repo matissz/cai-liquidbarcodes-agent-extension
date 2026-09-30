@@ -7,18 +7,18 @@ Liquid Barcodes Agent API Cognigy extension — **what** each test verifies and
 - **Test runner:** Jest 29 + `ts-jest` (config in [jest.config.js](../jest.config.js))
 - **HTTP mocking:** [`axios-mock-adapter`](https://www.npmjs.com/package/axios-mock-adapter)
 - **Test location:** [src/\_\_tests\_\_/](../src/__tests__/), grouped by usage
-- **Totals:** 20 deterministic suites · **226 tests** · +1 opt-in live suite
-  (**24 tests**) = **250 defined tests**
+- **Totals:** use the current Jest summary as the source of truth; the suite grows as branch,
+  normalization, and security cases are added. The live suite remains separately opt-in.
 
 ## How to run
 
 | Command | What it does |
 |---|---|
-| `npm test` | Runs all 226 deterministic tests; live integration is excluded. |
+| `npm test` | Runs all deterministic tests; live integration is excluded. |
 | `npm run test:auth` | Runs authentication and session tests in `src/__tests__/auth/`. |
 | `npm run test:nodes` | Runs protected read/write node tests in `src/__tests__/nodes/`. |
-| `npm run test:utils` | Runs signature, HTTP client, and error extraction tests. |
-| `npm run test:module` | Runs static extension registration/schema tests. |
+| `npm run test:utils` | Runs signature, HTTP client, error extraction, and result-routing tests. |
+| `npm run test:module` | Runs parent/child descriptor registration and schema tests. |
 | `npm run test:security` | Runs both mocked security files. |
 | `npm run test:integration` | Explicitly runs the credential-gated live sandbox file. |
 | `npm run test:coverage` | Deterministic tests with coverage collection. |
@@ -53,6 +53,7 @@ The remaining branch gaps are defensive `?? ''` / `?? null` fallbacks — see
   - [signature.test.ts](#signaturetestts)
   - [httpClient.test.ts](#httpclienttestts)
   - [extractApiError.test.ts](#extractapierrortestts)
+  - `routeToResultChild.test.ts` validates both outcomes, missing-child compatibility, unrelated children, and deterministic duplicate handling.
 - [Structure suite](#structure-suite)
   - [extension.test.ts](#extensiontestts)
 - [Authentication node suites](#authentication-node-suites)
@@ -82,6 +83,10 @@ The remaining branch gaps are defensive `?? ''` / `?? null` fallbacks — see
 ---
 
 ## Shared test mechanics (how the tests work)
+
+Branch-aware node tests provide `On Success` and `On Error` child configs through
+`createMockParams`. They assert `setNextNode` receives the expected child ID after
+`addToContext`, so routing cannot outrun response or error storage.
 
 Almost every node suite is built from the same reusable parts, defined in
 [src/\_\_tests\_\_/helpers.ts](../src/__tests__/helpers.ts). Understanding these five

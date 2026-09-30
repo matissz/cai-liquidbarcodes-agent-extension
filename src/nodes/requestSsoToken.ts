@@ -1,12 +1,16 @@
 import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
 import axios from 'axios';
 import { computeSignature } from '../utils/signature';
+import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
+import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { ISsoTokenResponse } from '../types/agentApi';
 
 export const requestSsoTokenNode = createNodeDescriptor({
   type: "requestSsoToken",
   defaultLabel: "Request SSO Token",
   summary: "Generate an SSO token for a user via the App API",
+  constraints: RESULT_CHILD_CONSTRAINTS,
+  dependencies: RESULT_CHILD_DEPENDENCIES,
 
   fields: [
     {
@@ -51,13 +55,14 @@ export const requestSsoTokenNode = createNodeDescriptor({
     { type: "section", key: "output" },
   ],
 
-  function: async ({ cognigy, config }: INodeFunctionBaseParams) => {
+  function: async ({ cognigy, config, childConfigs }: INodeFunctionBaseParams) => {
     const { api } = cognigy;
     const { connection, userId, contextKey } = config as any;
     const normalizedAppBaseUrl = String(connection?.appBaseUrl ?? '').trim().replace(/\/+$/, '');
     const normalizedAppSecretKey = String(connection?.appSecretKey ?? '').trim();
     const normalizedUserId = String(userId ?? '').trim();
     const url = `${normalizedAppBaseUrl}/auth/lb/tokens`;
+    let route: ResultRoute = 'error';
 
     try {
       const timestamp = new Date().toISOString();
@@ -102,6 +107,7 @@ export const requestSsoTokenNode = createNodeDescriptor({
 
       api.addToContext?.(contextKey, result, 'simple');
       api.log?.('info', 'SSO token request succeeded');
+      route = 'success';
     } catch (error: any) {
       const data = error?.response?.data;
       const rs = data?.responseStatus ?? data?.ResponseStatus;
@@ -119,5 +125,7 @@ export const requestSsoTokenNode = createNodeDescriptor({
       }));
       api.addToContext?.(contextKey, { error: { message, code, status: error?.response?.status } }, 'simple');
     }
+
+    routeToResultChild(childConfigs, api, route);
   },
 });

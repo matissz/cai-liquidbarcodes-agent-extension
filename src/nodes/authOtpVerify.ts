@@ -1,12 +1,16 @@
 import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
 import { makeAgentApiRequest } from '../utils/httpClient';
 import { extractApiError } from '../utils/extractApiError';
+import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
+import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { IOtpVerifyResponse } from '../types/agentApi';
 
 export const authOtpVerifyNode = createNodeDescriptor({
   type: "authOtpVerify",
   defaultLabel: "Verify OTP",
   summary: "Verify OTP code and obtain access token",
+  constraints: RESULT_CHILD_CONSTRAINTS,
+  dependencies: RESULT_CHILD_DEPENDENCIES,
 
   fields: [
     {
@@ -58,11 +62,12 @@ export const authOtpVerifyNode = createNodeDescriptor({
     { type: "section", key: "output" },
   ],
 
-  function: async ({ cognigy, config }: INodeFunctionBaseParams) => {
+  function: async ({ cognigy, config, childConfigs }: INodeFunctionBaseParams) => {
     const { api } = cognigy;
     const { connection, phone, code, contextKey } = config as any;
     const normalizedPhone = String(phone ?? '').trim();
     const normalizedCode = String(code ?? '').trim();
+    let route: ResultRoute = 'error';
 
     try {
       const response = await makeAgentApiRequest<IOtpVerifyResponse>({
@@ -86,10 +91,13 @@ export const authOtpVerifyNode = createNodeDescriptor({
 
       api.addToContext?.(contextKey, result, 'simple');
       api.log?.('info', 'OTP verification succeeded');
+      route = 'success';
     } catch (error: any) {
       const apiError = extractApiError(error);
       api.log?.('error', `OTP verification failed: ${apiError.message}`);
       api.addToContext?.(contextKey, { error: apiError }, 'simple');
     }
+
+    routeToResultChild(childConfigs, api, route);
   },
 });

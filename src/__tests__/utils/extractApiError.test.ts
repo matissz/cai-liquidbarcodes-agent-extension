@@ -25,29 +25,54 @@ describe('extractApiError', () => {
       });
     });
 
-    test('leaves status/traceId undefined when absent from data', () => {
+    test('preserves the complete Agent API bootstrap validation error', () => {
       const error = {
-        response: { data: { code: 'FORBIDDEN', detail: 'Not allowed' } },
+        response: {
+          status: 400,
+          data: {
+            code: 'BOOTSTRAP_VALIDATION_FAILED',
+            detail: 'The request body was invalid.',
+            status: 400,
+            traceId: 'trace-bootstrap',
+          },
+        },
+      };
+
+      expect(extractApiError(error)).toEqual({
+        message: 'The request body was invalid.',
+        code: 'BOOTSTRAP_VALIDATION_FAILED',
+        errorCode: undefined,
+        status: 400,
+        traceId: 'trace-bootstrap',
+      });
+    });
+
+    test('falls back to the HTTP response status when absent from data', () => {
+      const error = {
+        response: { status: 403, data: { code: 'FORBIDDEN', detail: 'Not allowed' } },
       };
 
       expect(extractApiError(error)).toEqual({
         message: 'Not allowed',
         code: 'FORBIDDEN',
         errorCode: undefined,
-        status: undefined,
+        status: 403,
         traceId: undefined,
       });
     });
 
-    test('falls through when only code is present (no detail)', () => {
+    test('preserves problem details when code is present without detail', () => {
       const error = {
-        response: { status: 500, data: { code: 'ERR' } },
+        message: 'Request failed with status code 500',
+        response: { status: 500, data: { code: 'ERR', errorCode: 1003, traceId: 'trace-partial' } },
       };
 
-      // No detail => not the problem-details branch; falls to HTTP-status fallback.
       expect(extractApiError(error)).toEqual({
-        message: 'HTTP 500: undefined',
+        message: 'Request failed with status code 500',
+        code: 'ERR',
+        errorCode: 1003,
         status: 500,
+        traceId: 'trace-partial',
       });
     });
   });
@@ -75,7 +100,7 @@ describe('extractApiError', () => {
 
       expect(extractApiError(error)).toEqual({
         message: 'Conflict',
-        status: undefined,
+        status: 409,
         traceId: undefined,
       });
     });

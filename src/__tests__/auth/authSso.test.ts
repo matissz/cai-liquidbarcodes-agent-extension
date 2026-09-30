@@ -2,6 +2,7 @@ import axios from 'axios';
 import crypto from 'crypto';
 import MockAdapter from 'axios-mock-adapter';
 import { authSsoNode } from '../../nodes/authSso';
+import { RESULT_CHILD_TYPES } from '../../nodes/resultBranches';
 import { createMockParams, TEST_CONNECTION, getNodeFunction } from '../helpers';
 
 const execute = getNodeFunction(authSsoNode);
@@ -17,6 +18,11 @@ afterEach(() => {
 });
 
 describe('authSso node (POST /v1/auth/sso)', () => {
+  const children = [
+    { id: 'success-child', type: RESULT_CHILD_TYPES.success, config: {} },
+    { id: 'error-child', type: RESULT_CHILD_TYPES.error, config: {} },
+  ];
+
   test('calls POST /v1/auth/sso with ssoToken body', async () => {
     mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/sso`).reply(200, {
       AccessToken: 'tok-123',
@@ -98,6 +104,23 @@ describe('authSso node (POST /v1/auth/sso)', () => {
       accessToken: 'tok-abc',
       expiresInSeconds: 7200,
     });
+  });
+
+  test('routes to On Success after storing a valid session', async () => {
+    mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/sso`).reply(200, {
+      AccessToken: 'tok-abc',
+      ExpiresInSeconds: 3600,
+    });
+    const { params, api } = createMockParams({
+      connection: TEST_CONNECTION,
+      ssoToken: 'token1',
+      contextKey: 'lb.session',
+    }, children);
+
+    await execute(params);
+
+    expect(api.setNextNode).toHaveBeenCalledWith('success-child');
+    expect(api.addToContext.mock.invocationCallOrder[0]).toBeLessThan(api.setNextNode.mock.invocationCallOrder[0]);
   });
 
   test('stores camelCase accessToken and expiresInSeconds in context', async () => {
@@ -194,6 +217,24 @@ describe('authSso node (POST /v1/auth/sso)', () => {
 
     expect(contextStore['lb.session'].error).toBeDefined();
     expect(contextStore['lb.session'].error.code).toBe('INVALID_SIGNATURE');
+  });
+
+  test('routes to On Error after storing a normalized failure', async () => {
+    mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/sso`).reply(401, {
+      detail: 'The request signature is invalid.',
+      code: 'INVALID_SIGNATURE',
+      status: 401,
+    });
+    const { params, api } = createMockParams({
+      connection: TEST_CONNECTION,
+      ssoToken: 'bad-token',
+      contextKey: 'lb.session',
+    }, children);
+
+    await execute(params);
+
+    expect(api.setNextNode).toHaveBeenCalledWith('error-child');
+    expect(api.addToContext.mock.invocationCallOrder[0]).toBeLessThan(api.setNextNode.mock.invocationCallOrder[0]);
   });
 
   test('logs error on failure', async () => {

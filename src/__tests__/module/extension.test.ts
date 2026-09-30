@@ -12,9 +12,16 @@ import { addSubscriptionUserNode } from '../../nodes/addSubscriptionUser';
 import { removeSubscriptionUserNode } from '../../nodes/removeSubscriptionUser';
 import { setPlateNumberNode } from '../../nodes/setPlateNumber';
 import { issueCouponNode } from '../../nodes/issueCoupon';
+import {
+  LIQUID_BARCODES_PARENT_TYPES,
+  RESULT_CHILD_TYPES,
+  liquidBarcodesOnErrorNode,
+  liquidBarcodesOnSuccessNode,
+} from '../../nodes/resultBranches';
 import { agentApiConnection } from '../../connections/agentApiConnection';
+import extension from '../../module';
 
-const ALL_NODES = [
+const PARENT_NODES = [
   requestSsoTokenNode,
   authSsoNode,
   authOtpStartNode,
@@ -30,47 +37,75 @@ const ALL_NODES = [
   setPlateNumberNode,
   issueCouponNode,
 ];
+const CHILD_NODES = [liquidBarcodesOnSuccessNode, liquidBarcodesOnErrorNode];
+const ALL_NODES = [...PARENT_NODES, ...CHILD_NODES];
 
 describe('Extension structure', () => {
-  test('all 14 nodes are defined', () => {
-    expect(ALL_NODES).toHaveLength(14);
+  test('all 14 API parents and two result children are defined', () => {
+    expect(PARENT_NODES).toHaveLength(14);
+    expect(CHILD_NODES).toHaveLength(2);
+    expect(ALL_NODES).toHaveLength(16);
+  });
+
+  test('extension registers both result children with all API parents', () => {
+    expect(extension.nodes.map(node => node.type)).toEqual(ALL_NODES.map(node => node.type));
   });
 
   test('all nodes have unique types', () => {
     const types = ALL_NODES.map(n => n.type);
-    expect(new Set(types).size).toBe(14);
+    expect(new Set(types).size).toBe(16);
   });
 
   test('all nodes have a defaultLabel', () => {
-    for (const node of ALL_NODES) {
+    for (const node of PARENT_NODES) {
       expect(node.defaultLabel).toBeTruthy();
     }
   });
 
   test('all nodes have a function', () => {
-    for (const node of ALL_NODES) {
+    for (const node of PARENT_NODES) {
       expect(typeof node.function).toBe('function');
     }
   });
 
   test('all nodes have fields', () => {
-    for (const node of ALL_NODES) {
+    for (const node of PARENT_NODES) {
       expect(node.fields!.length).toBeGreaterThan(0);
     }
   });
 
   test('all nodes have sections', () => {
-    for (const node of ALL_NODES) {
+    for (const node of PARENT_NODES) {
       expect(node.sections!.length).toBeGreaterThan(0);
     }
   });
 
   test('all nodes reference the correct connection type', () => {
-    for (const node of ALL_NODES) {
+    for (const node of PARENT_NODES) {
       const connField = node.fields!.find((f: any) => f.type === 'connection');
       expect(connField).toBeDefined();
       expect((connField as any).params.connectionType).toBe('liquid-barcodes-agent-api');
     }
+  });
+
+  test('all API parents create and allow only the shared result children', () => {
+    const expectedTypes = [RESULT_CHILD_TYPES.success, RESULT_CHILD_TYPES.error];
+
+    for (const node of PARENT_NODES) {
+      expect(node.dependencies?.children).toEqual(expectedTypes);
+      expect(node.constraints?.placement.children?.whitelist).toEqual(expectedTypes);
+    }
+  });
+
+  test('result children are fieldless mini nodes accepted by every API parent', () => {
+    for (const node of CHILD_NODES) {
+      expect(node.appearance.variant).toBe('mini');
+      expect(node.parentType).toEqual([...LIQUID_BARCODES_PARENT_TYPES]);
+      expect(node.fields).toEqual([]);
+      expect(node.function).toBeNull();
+    }
+    expect(liquidBarcodesOnSuccessNode.defaultLabel).toBe('On Success');
+    expect(liquidBarcodesOnErrorNode.defaultLabel).toBe('On Error');
   });
 
   test('all section field refs match actual field keys', () => {

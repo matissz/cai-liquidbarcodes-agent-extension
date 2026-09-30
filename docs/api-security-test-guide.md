@@ -62,10 +62,13 @@ edition; it is not the year in which these tests were written.
 Authentication tests additionally verify Liquid Barcodes-specific behavior:
 
 - OTP start maps `InvalidInput` / numeric `errorCode` `1001` without dropping data.
+- Invalid signatures preserve `InvalidSignature` / `1003` with HTTP `401`.
 - OTP verification maps uniform `AuthenticationFailed` / `1002` failures, which
   avoids exposing whether a phone, code, attempt counter, or expiry check failed.
 - Protected calls preserve `SessionInvalid` / `1004` and
-  `InsufficientScope` / `1005`.
+  `InsufficientScope` / `1005`, including a genuine HTTP `403` response.
+- Partial problem details preserve provider `code`, numeric `errorCode`, HTTP status,
+  and `traceId` even when the provider omits `detail` or body `status`.
 - OTP and SSO inputs are trimmed once and the same value is signed and transmitted.
 - Successful OTP/SSO responses must contain a nonblank access token and a positive,
   finite expiry. Malformed HTTP 200 responses are stored as errors.

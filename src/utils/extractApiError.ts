@@ -7,12 +7,12 @@ export function extractApiError(error: any): {
 } {
   const data = error?.response?.data;
 
-  if (data?.code && data?.detail) {
+  if (data?.code) {
     return {
-      message: data.detail,
+      message: data.detail ?? data.title ?? error?.message ?? `HTTP ${error?.response?.status ?? 'error'}`,
       code: data.code,
       errorCode: data.errorCode,
-      status: data.status,
+      status: data.status ?? error?.response?.status,
       traceId: data.traceId,
     };
   }
@@ -20,7 +20,7 @@ export function extractApiError(error: any): {
   if (data?.title) {
     return {
       message: data.title,
-      status: data.status,
+      status: data.status ?? error?.response?.status,
       traceId: data.traceId,
     };
   }

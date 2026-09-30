@@ -16,6 +16,7 @@ import { addSubscriptionUserNode } from "./nodes/addSubscriptionUser";
 import { removeSubscriptionUserNode } from "./nodes/removeSubscriptionUser";
 import { setPlateNumberNode } from "./nodes/setPlateNumber";
 import { issueCouponNode } from "./nodes/issueCoupon";
+import { liquidBarcodesOnErrorNode, liquidBarcodesOnSuccessNode } from './nodes/resultBranches';
 
 export default createExtension({
   nodes: [
@@ -33,6 +34,8 @@ export default createExtension({
     removeSubscriptionUserNode,
     setPlateNumberNode,
     issueCouponNode,
+    liquidBarcodesOnSuccessNode,
+    liquidBarcodesOnErrorNode,
   ],
   connections: [agentApiConnection],
   options: { label: "Liquid Barcodes Agent" },

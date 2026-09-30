@@ -1,12 +1,16 @@
 import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
 import { makeAgentApiRequest } from '../utils/httpClient';
 import { extractApiError } from '../utils/extractApiError';
+import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
+import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { IWriteOperationResult } from '../types/agentApi';
 
 export const cancelSubscriptionNode = createNodeDescriptor({
   type: "cancelSubscription",
   defaultLabel: "Cancel Subscription",
   summary: "Cancel a user's subscription by ID",
+  constraints: RESULT_CHILD_CONSTRAINTS,
+  dependencies: RESULT_CHILD_DEPENDENCIES,
 
   fields: [
     {
@@ -66,11 +70,12 @@ export const cancelSubscriptionNode = createNodeDescriptor({
     { type: "section", key: "output" },
   ],
 
-  function: async ({ cognigy, config }: INodeFunctionBaseParams) => {
+  function: async ({ cognigy, config, childConfigs }: INodeFunctionBaseParams) => {
     const { api } = cognigy;
     const { connection, accessToken, subscriptionId, contextKey } = config as any;
     const normalizedSubscriptionId = String(subscriptionId ?? '').trim();
     const numericSubscriptionId = Number(normalizedSubscriptionId);
+    let route: ResultRoute = 'error';
 
     api.log?.('info', JSON.stringify({
       event: 'lb.cancel.started',
@@ -114,6 +119,7 @@ export const cancelSubscriptionNode = createNodeDescriptor({
         contextKey,
         success: true,
       }));
+      route = 'success';
     } catch (error: any) {
       const apiError = extractApiError(error);
       api.log?.('error', JSON.stringify({
@@ -131,5 +137,7 @@ export const cancelSubscriptionNode = createNodeDescriptor({
         success: false,
       }));
     }
+
+    routeToResultChild(childConfigs, api, route);
   },
 });

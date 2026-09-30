@@ -59,10 +59,10 @@ Every node produces **one of two** possible results:
   }
   ```
 
-> ⚠️ **Important:** A node **never stops the flow when it fails.** It simply saves the error
-> and lets the flow continue. Always add a check after each node, for example
-> `{{context.liquidBarcodesAgent.session.error}}` — if that has a value, the call failed and
-> you should handle it (show a friendly message, retry, or stop).
+> **Important:** Every API node stores its result first, then selects a built-in **On Success**
+> or **On Error** child. Connect both children. Expressions such as
+> `{{context.liquidBarcodesAgent.session.error}}` remain useful inside the Error path for
+> classification, user messaging, and trace correlation.
 
 ---
 
@@ -117,12 +117,12 @@ data/action node.
 > `context.liquidBarcodesAgent.user.UserId` to your Cognigy contact profile. On the next
 > visit you can use the silent **SSO** path and skip the phone/SMS step entirely.
 
-### Check for errors between each step
+### Connect Success and Error children between each step
 
-Because a failed node does **not** stop the flow, add an error check after each step before
-continuing:
+Connect the next API operation beneath **On Success**. Connect a retry, fallback, or friendly
+message beneath **On Error**. The following context paths provide details inside Error paths:
 
-| After this node | Check | If it has a value |
+| After this node | Diagnostic context path | Typical Error-child handling |
 |---|---|---|
 | Request SSO Token | `context.liquidBarcodesAgent.ssoToken.error` | Stop / show "couldn't verify account" |
 | Exchange SSO Token | `context.liquidBarcodesAgent.session.error` | Stop / show "authentication failed" |
@@ -647,8 +647,9 @@ These nodes **change something** in the user's account. They all need a valid lo
 - **Login expires:** Access tokens usually last 1 hour (`expiresInSeconds`). There is **no
   automatic refresh**. If a node returns an authentication error, sign the user in again.
 - **SSO tokens are single-use:** Each token from Request SSO Token can be exchanged only once.
-- **Errors don't stop the flow:** A failed node saves an `error` object and continues. You
-  must check for it after each node.
+- **Failures use a dedicated child:** A failed node saves an `error` object and selects its
+  **On Error** child. Older flow instances without that child log a warning and retain their
+  previous linear successor behavior until updated.
 - **Rate limits:** Not documented yet — leave reasonable gaps between calls.
 - **Phone format:** Digits only, with country code, no leading `+`.
 - **Identity is phone-only:** In the phone (OTP) path, a phone number + SMS code is the only

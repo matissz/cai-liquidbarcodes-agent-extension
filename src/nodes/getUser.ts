@@ -1,12 +1,16 @@
 import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
 import { makeAgentApiRequest } from '../utils/httpClient';
 import { extractApiError } from '../utils/extractApiError';
+import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
+import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { IUserResponse } from '../types/agentApi';
 
 export const getUserNode = createNodeDescriptor({
   type: "getUser",
   defaultLabel: "Get User Profile",
   summary: "Retrieve the signed-in user's profile",
+  constraints: RESULT_CHILD_CONSTRAINTS,
+  dependencies: RESULT_CHILD_DEPENDENCIES,
 
   fields: [
     {
@@ -52,9 +56,10 @@ export const getUserNode = createNodeDescriptor({
     { type: "section", key: "output" },
   ],
 
-  function: async ({ cognigy, config }: INodeFunctionBaseParams) => {
+  function: async ({ cognigy, config, childConfigs }: INodeFunctionBaseParams) => {
     const { api } = cognigy;
     const { connection, accessToken, contextKey } = config as any;
+    let route: ResultRoute = 'error';
 
     try {
       const response = await makeAgentApiRequest<IUserResponse>({
@@ -70,10 +75,13 @@ export const getUserNode = createNodeDescriptor({
 
       api.addToContext?.(contextKey, response.data, 'simple');
       api.log?.('info', 'Get user profile succeeded');
+      route = 'success';
     } catch (error: any) {
       const apiError = extractApiError(error);
       api.log?.('error', `Get user profile failed: ${apiError.message}`);
       api.addToContext?.(contextKey, { error: apiError }, 'simple');
     }
+
+    routeToResultChild(childConfigs, api, route);
   },
 });

@@ -146,4 +146,30 @@ describe('authOtpStart node (POST /v1/auth/otp/start)', () => {
       traceId: 'trace-invalid-phone',
     });
   });
+
+  test('preserves InvalidSignature error details', async () => {
+    mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/otp/start`).reply(401, {
+      detail: 'The request signature is invalid.',
+      code: 'InvalidSignature',
+      errorCode: 1003,
+      status: 401,
+      traceId: 'trace-invalid-signature',
+    });
+
+    const { params, contextStore } = createMockParams({
+      connection: TEST_CONNECTION,
+      phone: '34111111111',
+      contextKey: 'lb.otp',
+    });
+
+    await execute(params);
+
+    expect(contextStore['lb.otp'].error).toEqual({
+      message: 'The request signature is invalid.',
+      code: 'InvalidSignature',
+      errorCode: 1003,
+      status: 401,
+      traceId: 'trace-invalid-signature',
+    });
+  });
 });

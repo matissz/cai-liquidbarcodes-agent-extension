@@ -188,11 +188,11 @@ The first time a user interacts with the chatbot, no UserId is available. The OT
    phone: {{input.text}}
    --> SMS sent, result in context.liquidBarcodesAgent.otpStart
 
-3. [IF] context.liquidBarcodesAgent.otpStart.error
+3. [Start OTP: On Error]
    --> Say "We couldn't send a verification code. Please check your number."
    --> END
 
-4. [Question] "Enter the code you received via SMS"
+4. [Start OTP: On Success] --> [Question] "Enter the code you received via SMS"
    --> User types: 3565
 
 5. [Verify OTP]
@@ -200,11 +200,11 @@ The first time a user interacts with the chatbot, no UserId is available. The OT
    code: {{input.text}}
    --> Session created in context.liquidBarcodesAgent.session
 
-6. [IF] context.liquidBarcodesAgent.session.error
+6. [Verify OTP: On Error]
    --> Say "Invalid code. Please try again."
    --> Go back to step 4 (or restart)
 
-7. [Get User Profile]
+7. [Verify OTP: On Success] --> [Get User Profile]
    accessToken: (auto-filled)
    --> User data in context.liquidBarcodesAgent.user
 
@@ -506,7 +506,7 @@ for a single car wash with Liquid Barcodes.
 
 ## Error Handling
 
-Every node follows the same error pattern. On failure, the result stored in context contains an `error` object instead of the normal response:
+Every API node has built-in **On Success** and **On Error** children. The node stores its response or normalized error in context before selecting the matching child. On failure, context contains an `error` object instead of the normal response:
 
 ```json
 {
@@ -518,19 +518,21 @@ Every node follows the same error pattern. On failure, the result stored in cont
 }
 ```
 
-In your Cognigy flow, check for errors with a condition like:
+Inside the **On Error** child, inspect details with a context expression such as:
 
 ```
 {{context.liquidBarcodesAgent.session.error}}
 ```
 
-If truthy, the call failed. The `message` field contains a human-readable description. Common error codes:
+The `message` field contains a human-readable description. `code`, `errorCode`, `status`, and `traceId` are retained when supplied by the API. Common documented codes include:
 
 | Code | Status | Meaning |
 |---|---|---|
 | `INVALID_SIGNATURE` | 401 | Signature or timestamp is invalid -- check connection credentials |
 | `BOOTSTRAP_VALIDATION_FAILED` | 400 | Request validation failed -- check input fields |
-| `AUTHENTICATION_FAILED` | 401 | Bearer token is missing, expired, or invalid |
+| `AuthenticationFailed` / `1002` | 401 | OTP verification or authentication failed |
+| `SessionInvalid` / `1004` | 401 | Bearer session is missing, expired, or invalid |
+| `InsufficientScope` / `1005` | 403 | Session does not permit the requested operation |
 
 ---
 
@@ -566,19 +568,19 @@ A typical Cognigy flow using the SSO path to look up a user's subscription:
    userId: {{profile.lbUserId}}
    --> stores token in context.liquidBarcodesAgent.ssoToken
 
-2. [IF] context.liquidBarcodesAgent.ssoToken.error
+2. [Request SSO Token: On Error]
    --> Say "Sorry, we couldn't verify your account."
    --> END
 
-3. [Exchange SSO Token]
+3. [Request SSO Token: On Success] --> [Exchange SSO Token]
    ssoToken: (auto-filled from step 1)
    --> stores session in context.liquidBarcodesAgent.session
 
-4. [IF] context.liquidBarcodesAgent.session.error
+4. [Exchange SSO Token: On Error]
    --> Say "Authentication failed. Please try again."
    --> END
 
-5. [Get User Profile]
+5. [Exchange SSO Token: On Success] --> [Get User Profile]
    accessToken: (auto-filled from step 3)
    --> stores user in context.liquidBarcodesAgent.user
 

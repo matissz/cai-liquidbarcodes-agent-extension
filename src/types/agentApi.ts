@@ -252,6 +252,7 @@ export interface IApiProblemDetails {
   detail: string;
   instance: string;
   code: string;
+  errorCode?: number | string;
   traceId: string;
 }
 

@@ -1,12 +1,16 @@
 import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
 import { makeAgentApiRequest } from '../utils/httpClient';
 import { extractApiError } from '../utils/extractApiError';
+import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
+import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { IStoresResponse } from '../types/agentApi';
 
 export const getStoresNode = createNodeDescriptor({
   type: "getStores",
   defaultLabel: "Get Stores",
   summary: "List stores or get a specific store by ID",
+  constraints: RESULT_CHILD_CONSTRAINTS,
+  dependencies: RESULT_CHILD_DEPENDENCIES,
 
   fields: [
     {
@@ -65,9 +69,10 @@ export const getStoresNode = createNodeDescriptor({
     { type: "section", key: "output" },
   ],
 
-  function: async ({ cognigy, config }: INodeFunctionBaseParams) => {
+  function: async ({ cognigy, config, childConfigs }: INodeFunctionBaseParams) => {
     const { api } = cognigy;
     const { connection, accessToken, storeId, contextKey } = config as any;
+    let route: ResultRoute = 'error';
 
     try {
       const signatureFields: string[] = [];
@@ -93,10 +98,13 @@ export const getStoresNode = createNodeDescriptor({
       const stores = response.data.stores ?? response.data.Stores ?? [];
       api.addToContext?.(contextKey, response.data, 'simple');
       api.log?.('info', `Get stores succeeded (${stores.length} stores)`);
+      route = 'success';
     } catch (error: any) {
       const apiError = extractApiError(error);
       api.log?.('error', `Get stores failed: ${apiError.message}`);
       api.addToContext?.(contextKey, { error: apiError }, 'simple');
     }
+
+    routeToResultChild(childConfigs, api, route);
   },
 });
