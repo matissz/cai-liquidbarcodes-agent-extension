@@ -1,8 +1,8 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import MockAdapter from 'axios-mock-adapter';
-import { issueCouponNode } from '../nodes/issueCoupon';
-import { createMockParams, TEST_CONNECTION, getNodeFunction } from './helpers';
+import { issueCouponNode } from '../../nodes/issueCoupon';
+import { createMockParams, TEST_CONNECTION, getNodeFunction } from '../helpers';
 
 const execute = getNodeFunction(issueCouponNode);
 let mock: MockAdapter;

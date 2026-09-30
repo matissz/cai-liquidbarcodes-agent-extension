@@ -1,8 +1,8 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import MockAdapter from 'axios-mock-adapter';
-import { getUserNode } from '../nodes/getUser';
-import { createMockParams, TEST_CONNECTION, getNodeFunction } from './helpers';
+import { getUserNode } from '../../nodes/getUser';
+import { createMockParams, TEST_CONNECTION, getNodeFunction } from '../helpers';
 
 const execute = getNodeFunction(getUserNode);
 let mock: MockAdapter;
@@ -92,10 +92,15 @@ describe('getUser node (GET /v1/user)', () => {
     expect(contextStore['lb.user'].Msn).toBe(MOCK_USER.Msn);
   });
 
-  test('handles API error', async () => {
+  test.each([
+    ['SessionInvalid', 1004, 401],
+    ['InsufficientScope', 1005, 403],
+  ])('preserves %s protected-session error', async (code, errorCode, status) => {
     mock.onGet(`${TEST_CONNECTION.baseUrl}/v1/user`).reply(401, {
-      detail: 'Authentication failed.',
-      code: 'INVALID_SIGNATURE',
+      detail: 'Protected request failed.',
+      code,
+      errorCode,
+      status,
     });
 
     const { params, contextStore } = createMockParams({
@@ -106,6 +111,12 @@ describe('getUser node (GET /v1/user)', () => {
 
     await execute(params);
 
-    expect(contextStore['lb.user'].error).toBeDefined();
+    expect(contextStore['lb.user'].error).toEqual({
+      message: 'Protected request failed.',
+      code,
+      errorCode,
+      status,
+      traceId: undefined,
+    });
   });
 });

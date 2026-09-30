@@ -1,6 +1,7 @@
 export function extractApiError(error: any): {
   message: string;
   code?: string;
+  errorCode?: number | string;
   status?: number;
   traceId?: string;
 } {
@@ -10,6 +11,7 @@ export function extractApiError(error: any): {
     return {
       message: data.detail,
       code: data.code,
+      errorCode: data.errorCode,
       status: data.status,
       traceId: data.traceId,
     };

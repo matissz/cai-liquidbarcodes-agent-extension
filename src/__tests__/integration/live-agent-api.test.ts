@@ -18,11 +18,12 @@ const APP_TEST_USER_ID = process.env.LB_APP_TEST_USER_ID;
 // ── Durable SSO tokens ──
 const TEST_SSO_TOKEN = process.env.LB_AGENT_TEST_SSO_TOKEN;
 const TEST_SSO_USER_ID = process.env.LB_AGENT_TEST_SSO_USER_ID;
+const RUN_STATEFUL_OTP_TESTS = process.env.LB_RUN_STATEFUL_OTP_TESTS === 'true';
 
 // ── Feature guards ──
 const HAS_CREDS = BASE_URL && API_KEY && SALT;
 const HAS_APP_CREDS = APP_BASE_URL && APP_SECRET_KEY;
-const HAS_OTP = HAS_CREDS && TEST_PHONE;
+const HAS_OTP = HAS_CREDS && TEST_PHONE && RUN_STATEFUL_OTP_TESTS;
 const HAS_OTP_CODE = HAS_OTP && TEST_OTP_CODE;
 const HAS_DURABLE_SSO = HAS_CREDS && TEST_SSO_TOKEN;
 const HAS_FULL_SSO = HAS_CREDS && HAS_APP_CREDS && APP_TEST_USER_ID;
@@ -64,6 +65,10 @@ function makeAppApiHeaders(userId: string) {
   };
 }
 
+function getResponseValue<T>(data: Record<string, T>, pascalCase: string, camelCase: string): T {
+  return data[pascalCase] ?? data[camelCase];
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const describeIntegration = HAS_CREDS ? describe : describe.skip;
@@ -93,13 +98,13 @@ describeIntegration('Integration: Liquid Barcodes Agent API (sandbox)', () => {
 
   // ── Section 2: OTP Flow ──────────────────────────────────────────────────
 
-  describe('OTP Flow', () => {
+  const describeOtp = HAS_OTP ? describe : describe.skip;
+
+  describeOtp('OTP Flow (stateful opt-in)', () => {
     let otpAccessToken: string | undefined;
 
     test('POST /v1/auth/otp/start sends OTP to test phone', async () => {
-      if (!TEST_PHONE) return;
-
-      const headers = makeHeaders([TEST_PHONE]);
+      const headers = makeHeaders([TEST_PHONE!]);
       const res = await axios.post(
         `${BASE_URL}/v1/auth/otp/start`,
         { phone: TEST_PHONE },
@@ -107,8 +112,7 @@ describeIntegration('Integration: Liquid Barcodes Agent API (sandbox)', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(res.data).toHaveProperty('Phone');
-      expect(res.data.Phone).toBe(TEST_PHONE);
+      expect(getResponseValue(res.data, 'Phone', 'phone')).toBe(TEST_PHONE);
     });
 
     test('POST /v1/auth/otp/start returns error on empty phone', async () => {
@@ -126,13 +130,10 @@ describeIntegration('Integration: Liquid Barcodes Agent API (sandbox)', () => {
       }
     });
 
-    test('POST /v1/auth/otp/verify completes OTP and returns access token', async () => {
-      if (!HAS_OTP_CODE) {
-        console.warn('Skipping: LB_AGENT_TEST_OTP_CODE not set');
-        return;
-      }
+    const describeOtpVerification = HAS_OTP_CODE ? describe : describe.skip;
 
-      try {
+    describeOtpVerification('OTP verification', () => {
+      test('POST /v1/auth/otp/verify completes OTP and returns access token', async () => {
         // Trigger OTP first
         const startHeaders = makeHeaders([TEST_PHONE!]);
         await axios.post(
@@ -150,28 +151,25 @@ describeIntegration('Integration: Liquid Barcodes Agent API (sandbox)', () => {
         );
 
         expect(res.status).toBe(200);
-        expect(typeof res.data.AccessToken).toBe('string');
-        expect(res.data.AccessToken.length).toBeGreaterThan(0);
-        expect(typeof res.data.ExpiresInSeconds).toBe('number');
-        expect(res.data.ExpiresInSeconds).toBeGreaterThan(0);
-        otpAccessToken = res.data.AccessToken;
-      } catch (error: any) {
-        console.warn(`OTP verify not yet functional in sandbox (${error.response?.status ?? error.message}) — skipping gracefully`);
-      }
-    });
+        const accessToken = getResponseValue<string>(res.data, 'AccessToken', 'accessToken');
+        const expiresInSeconds = getResponseValue<number>(res.data, 'ExpiresInSeconds', 'expiresInSeconds');
+        expect(typeof accessToken).toBe('string');
+        expect(accessToken.length).toBeGreaterThan(0);
+        expect(typeof expiresInSeconds).toBe('number');
+        expect(expiresInSeconds).toBeGreaterThan(0);
+        otpAccessToken = accessToken;
+      });
 
-    test('OTP access token → GET /v1/user returns profile', async () => {
-      if (!otpAccessToken) {
-        console.warn('Skipping: OTP did not produce an access token');
-        return;
-      }
+      test('OTP access token → GET /v1/user returns profile', async () => {
+        expect(otpAccessToken).toBeTruthy();
 
-      const headers = makeHeaders([], otpAccessToken);
-      const res = await axios.get(`${BASE_URL}/v1/user`, { headers });
+        const headers = makeHeaders([], otpAccessToken);
+        const res = await axios.get(`${BASE_URL}/v1/user`, { headers });
 
-      expect(res.status).toBe(200);
-      expect(typeof res.data.UserId).toBe('string');
-      expect(typeof res.data.Msn).toBe('string');
+        expect(res.status).toBe(200);
+        expect(typeof getResponseValue(res.data, 'UserId', 'userId')).toBe('string');
+        expect(typeof getResponseValue(res.data, 'Msn', 'msn')).toBe('string');
+      });
     });
   });
 
@@ -460,13 +458,10 @@ describeIntegration('Integration: Liquid Barcodes Agent API (sandbox)', () => {
       }
     });
 
-    test('POST /auth/lb/tokens with valid UserId generates SSO token', async () => {
-      if (!APP_TEST_USER_ID) {
-        console.warn('Skipping: LB_APP_TEST_USER_ID not set');
-        return;
-      }
+    const testWithAppUser = APP_TEST_USER_ID ? test : test.skip;
 
-      const headers = makeAppApiHeaders(APP_TEST_USER_ID);
+    testWithAppUser('POST /auth/lb/tokens with valid UserId generates SSO token', async () => {
+      const headers = makeAppApiHeaders(APP_TEST_USER_ID!);
       const res = await axios.post(
         `${APP_BASE_URL}/auth/lb/tokens`,
         { UserId: APP_TEST_USER_ID },

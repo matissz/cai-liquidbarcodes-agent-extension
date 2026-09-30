@@ -1,8 +1,8 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import MockAdapter from 'axios-mock-adapter';
-import { authSsoNode } from '../nodes/authSso';
-import { createMockParams, TEST_CONNECTION, getNodeFunction } from './helpers';
+import { authSsoNode } from '../../nodes/authSso';
+import { createMockParams, TEST_CONNECTION, getNodeFunction } from '../helpers';
 
 const execute = getNodeFunction(authSsoNode);
 let mock: MockAdapter;
@@ -33,6 +33,29 @@ describe('authSso node (POST /v1/auth/sso)', () => {
 
     const body = JSON.parse(mock.history.post[0].data);
     expect(body.ssoToken).toBe('Testtoken123');
+  });
+
+  test('trims SSO token consistently in body and signature', async () => {
+    const fixedTime = '2026-01-01T00:00:00.000Z';
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedTime);
+    mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/sso`).reply(200, {
+      AccessToken: 'tok',
+      ExpiresInSeconds: 3600,
+    });
+
+    const { params } = createMockParams({
+      connection: TEST_CONNECTION,
+      ssoToken: '  Testtoken123  ',
+      contextKey: 'lb.session',
+    });
+
+    await execute(params);
+
+    const body = JSON.parse(mock.history.post[0].data);
+    const expectedInput = fixedTime + 'Testtoken123' + TEST_CONNECTION.signatureSalt;
+    const expectedSignature = crypto.createHash('sha256').update(expectedInput, 'utf8').digest('hex');
+    expect(body.ssoToken).toBe('Testtoken123');
+    expect(mock.history.post[0].headers!['X-Liquid-Signature']).toBe(expectedSignature);
   });
 
   test('signature = SHA256(timestamp + ssoToken + salt)', async () => {
@@ -94,6 +117,25 @@ describe('authSso node (POST /v1/auth/sso)', () => {
     expect(contextStore['lb.session']).toEqual({
       accessToken: 'camel-tok',
       expiresInSeconds: 3600,
+    });
+  });
+
+  test.each([
+    [{ ExpiresInSeconds: 3600 }],
+    [{ AccessToken: 'tok', ExpiresInSeconds: -1 }],
+    [{ AccessToken: '', ExpiresInSeconds: 3600 }],
+  ])('stores an error for malformed successful session response %#', async responseBody => {
+    mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/sso`).reply(200, responseBody);
+    const { params, contextStore } = createMockParams({
+      connection: TEST_CONNECTION,
+      ssoToken: 'token1',
+      contextKey: 'lb.session',
+    });
+
+    await execute(params);
+
+    expect(contextStore['lb.session']).toEqual({
+      error: { message: 'Liquid Barcodes returned an invalid SSO session response.' },
     });
   });
 

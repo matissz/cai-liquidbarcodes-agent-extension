@@ -76,10 +76,13 @@ export const authOtpVerifyNode = createNodeDescriptor({
         log: (level, message) => api.log?.(level, message),
       });
 
-      const result = {
-        accessToken: response.data.accessToken ?? response.data.AccessToken,
-        expiresInSeconds: response.data.expiresInSeconds ?? response.data.ExpiresInSeconds,
-      };
+      const accessToken = response.data.accessToken ?? response.data.AccessToken;
+      const expiresInSeconds = response.data.expiresInSeconds ?? response.data.ExpiresInSeconds;
+      if (typeof accessToken !== 'string' || !accessToken.trim() || !Number.isFinite(expiresInSeconds) || expiresInSeconds! <= 0) {
+        throw new Error('Liquid Barcodes returned an invalid OTP session response.');
+      }
+
+      const result = { accessToken, expiresInSeconds };
 
       api.addToContext?.(contextKey, result, 'simple');
       api.log?.('info', 'OTP verification succeeded');

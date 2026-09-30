@@ -1,8 +1,8 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import MockAdapter from 'axios-mock-adapter';
-import { removeSubscriptionUserNode } from '../nodes/removeSubscriptionUser';
-import { createMockParams, TEST_CONNECTION, getNodeFunction } from './helpers';
+import { removeSubscriptionUserNode } from '../../nodes/removeSubscriptionUser';
+import { createMockParams, TEST_CONNECTION, getNodeFunction } from '../helpers';
 
 const execute = getNodeFunction(removeSubscriptionUserNode);
 let mock: MockAdapter;

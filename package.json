@@ -13,10 +13,16 @@
     "build": "webpack",
     "watch": "webpack --watch",
     "pack:cognigy": "webpack --mode production && node scripts/pack.js",
-    "test": "jest",
-    "test:coverage": "jest --coverage",
-    "test:coverage:detailed": "jest --coverage --verbose --testPathIgnorePatterns=integration.test.ts",
-    "test:ci": "jest --coverage --ci --testPathIgnorePatterns=integration.test.ts"
+    "test": "jest --runInBand --testPathIgnorePatterns=src/__tests__/integration/",
+    "test:auth": "jest --runInBand src/__tests__/auth",
+    "test:nodes": "jest --runInBand src/__tests__/nodes",
+    "test:utils": "jest --runInBand src/__tests__/utils",
+    "test:module": "jest --runInBand src/__tests__/module",
+    "test:security": "jest --runInBand src/__tests__/security",
+    "test:integration": "jest --runInBand src/__tests__/integration",
+    "test:coverage": "jest --coverage --testPathIgnorePatterns=src/__tests__/integration/",
+    "test:coverage:detailed": "jest --coverage --verbose --testPathIgnorePatterns=src/__tests__/integration/",
+    "test:ci": "jest --coverage --ci --runInBand --testPathIgnorePatterns=src/__tests__/integration/"
   },
   "keywords": [
     "cognigy",

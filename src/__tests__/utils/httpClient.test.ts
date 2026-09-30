@@ -1,6 +1,6 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
-import { makeAgentApiRequest } from '../utils/httpClient';
+import { makeAgentApiRequest } from '../../utils/httpClient';
 
 let mock: MockAdapter;
 

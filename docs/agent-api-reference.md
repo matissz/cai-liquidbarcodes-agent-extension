@@ -889,4 +889,4 @@ Returned on **400** and **401** responses across all endpoints.
 > For all signatures: trim each part, concatenate with **no** separators, UTF-8 encode, SHA-256 hash, output as lowercase hex. Omit absent optional values from the concatenation.
 >
 > The signature orders for the six write endpoints above were **verified against the sandbox**
-> (each returns a non-`INVALID_SIGNATURE` response). See `src/__tests__/integration.test.ts`.
+> (each returns a non-`INVALID_SIGNATURE` response). See `src/__tests__/integration/live-agent-api.test.ts`.

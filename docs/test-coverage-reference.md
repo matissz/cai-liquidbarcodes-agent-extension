@@ -6,17 +6,30 @@ Liquid Barcodes Agent API Cognigy extension — **what** each test verifies and
 
 - **Test runner:** Jest 29 + `ts-jest` (config in [jest.config.js](../jest.config.js))
 - **HTTP mocking:** [`axios-mock-adapter`](https://www.npmjs.com/package/axios-mock-adapter)
-- **Test location:** [src/\_\_tests\_\_/](../src/__tests__/)
-- **Totals:** 19 unit suites · **193 unit tests** · +1 env-gated integration suite (**24 tests**) = **217 total**
+- **Test location:** [src/\_\_tests\_\_/](../src/__tests__/), grouped by usage
+- **Totals:** 20 deterministic suites · **226 tests** · +1 opt-in live suite
+  (**24 tests**) = **250 defined tests**
 
 ## How to run
 
 | Command | What it does |
 |---|---|
-| `npm test` | Runs every suite (incl. the live-sandbox `integration.test.ts` when `.env` credentials are present). |
-| `npm run test:coverage` | Same, with coverage collection. |
-| `npm run test:coverage:detailed` | **Recommended for reviewing coverage.** Unit tests only (excludes live integration), `--verbose` prints every test name plus the per-file coverage table. |
-| `npm run test:ci` | Unit tests + coverage + threshold enforcement (for CI). |
+| `npm test` | Runs all 226 deterministic tests; live integration is excluded. |
+| `npm run test:auth` | Runs authentication and session tests in `src/__tests__/auth/`. |
+| `npm run test:nodes` | Runs protected read/write node tests in `src/__tests__/nodes/`. |
+| `npm run test:utils` | Runs signature, HTTP client, and error extraction tests. |
+| `npm run test:module` | Runs static extension registration/schema tests. |
+| `npm run test:security` | Runs both mocked security files. |
+| `npm run test:integration` | Explicitly runs the credential-gated live sandbox file. |
+| `npm run test:coverage` | Deterministic tests with coverage collection. |
+| `npm run test:coverage:detailed` | Deterministic coverage plus every test name. |
+| `npm run test:ci` | Serial deterministic coverage with threshold enforcement. |
+
+Run any single file independently with its final path, for example:
+
+```powershell
+npx jest --runInBand src/__tests__/auth/authOtpVerify.test.ts
+```
 
 ## Coverage snapshot (unit suites)
 
@@ -59,10 +72,11 @@ The remaining branch gaps are defensive `?? ''` / `?? null` fallbacks — see
   - [removeSubscriptionUser.test.ts](#removesubscriptionusertestts)
   - [setPlateNumber.test.ts](#setplatenumbertestts)
   - [issueCoupon.test.ts](#issuecoupontestts)
-- [Cross-cutting security suite](#cross-cutting-security-suite)
-  - [security.test.ts](#securitytestts)
+- [Cross-cutting security suites](#cross-cutting-security-suites)
+  - [credential-leakage.test.ts](#credential-leakagetestts)
+  - [outbound-api-security.test.ts](#outbound-api-securitytestts)
 - [Live integration suite](#live-integration-suite)
-  - [integration.test.ts](#integrationtestts)
+  - [live-agent-api.test.ts](#live-agent-apitestts)
 - [Known coverage gaps](#known-coverage-gaps)
 
 ---
@@ -141,7 +155,7 @@ handling.
 ### httpClient.test.ts
 
 - **Target:** [src/utils/httpClient.ts](../src/utils/httpClient.ts) — `makeAgentApiRequest(...)`
-- **Suite:** `makeAgentApiRequest` · **9 tests**
+- **Suite:** `makeAgentApiRequest` · **10 tests**
 - **How:** Uses `axios-mock-adapter`; inspects `mock.history` for headers/params and the returned value.
 
 | # | Test | What it verifies |
@@ -155,6 +169,7 @@ handling.
 | 7 | appends query params for GET requests | `queryParams` forwarded to `request.params`. |
 | 8 | returns data and status | Resolves `{ data, status }` from the response. |
 | 9 | throws on error response | Rejects on a 401 problem-details response. |
+| 10 | logs failure diagnostics without exposing credentials | Error logs keep status/code/trace data while excluding the API key, salt, token, and signed fields. |
 
 ### extractApiError.test.ts
 
@@ -164,7 +179,7 @@ handling.
 
 | Branch | Test | What it verifies |
 |---|---|---|
-| RFC problem-details (`code` + `detail`) | maps detail/code/status/traceId | Full mapping when all fields present. |
+| RFC problem-details (`code` + `detail`) | maps detail/code/errorCode/status/traceId | Full mapping, including numeric LB `errorCode`, when all fields are present. |
 | | leaves status/traceId undefined when absent | Missing optional fields → `undefined`. |
 | | falls through when only code is present (no detail) | Without `detail`, drops to the HTTP-status branch (`HTTP 500: ...`). |
 | title-only | maps title/status/traceId when code+detail absent | Uses `data.title` as the message. |
@@ -225,43 +240,51 @@ handling.
 ### authSso.test.ts
 
 - **Target:** [src/nodes/authSso.ts](../src/nodes/authSso.ts) — POST `/v1/auth/sso`
-- **Suite:** `authSso node (POST /v1/auth/sso)` · **7 tests**
+- **Suite:** `authSso node (POST /v1/auth/sso)` · **12 generated tests**
 
 | # | Test | What / how |
 |---|---|---|
 | 1 | calls POST /v1/auth/sso with ssoToken body | Body `{ ssoToken }`. |
-| 2 | signature = SHA256(timestamp + ssoToken + salt) | Exact signature (time pinned). |
-| 3 | stores accessToken and expiresInSeconds in context | `{ accessToken, expiresInSeconds }`. |
-| 4 | sends X-Customer-Api-Key header | Customer key present (Agent API). |
-| 5 | does NOT send Authorization header | No bearer on the exchange call. |
-| 6 | handles API error and stores error in context | 401 problem-details → `error.code === 'INVALID_SIGNATURE'`. |
-| 7 | logs error on failure | 400 response → `error`-level log recorded. |
+| 2 | trims token consistently in body and signature | Prevents signing/transmission mismatches caused by surrounding whitespace. |
+| 3 | signature = SHA256(timestamp + ssoToken + salt) | Exact signature (time pinned). |
+| 4 | stores PascalCase session response | `{ AccessToken, ExpiresInSeconds }` becomes normalized context data. |
+| 5 | stores camelCase sandbox response | `{ accessToken, expiresInSeconds }` is also accepted. |
+| 6-8 | rejects malformed successful session responses | Missing/blank token or non-positive expiry becomes a stored error instead of an invalid session. |
+| 9 | sends X-Customer-Api-Key header | Customer key present (Agent API). |
+| 10 | does NOT send Authorization header | No bearer on the exchange call. |
+| 11 | handles API error and stores error in context | 401 problem-details preserves the provider code. |
+| 12 | logs error on failure | 400 response produces an `error`-level log. |
 
 ### authOtpStart.test.ts
 
 - **Target:** [src/nodes/authOtpStart.ts](../src/nodes/authOtpStart.ts) — POST `/v1/auth/otp/start`
-- **Suite:** `authOtpStart node (POST /v1/auth/otp/start)` · **5 tests**
+- **Suite:** `authOtpStart node (POST /v1/auth/otp/start)` · **7 tests**
 
 | # | Test | What / how |
 |---|---|---|
 | 1 | calls POST with phone body | Body `{ phone }`. |
 | 2 | signature = SHA256(timestamp + phone + salt) | Exact signature. |
-| 3 | stores phone response in context | `{ phone }` saved. |
-| 4 | does NOT send Authorization header | Pre-auth call, no bearer. |
-| 5 | handles API error | 400 → `error` stored in context. |
+| 3 | trims phone consistently in body and signature | One normalized phone value is signed and sent. |
+| 4 | stores PascalCase phone response | `{ Phone }` is normalized and saved. |
+| 5 | stores camelCase sandbox phone response | `{ phone }` is also accepted. |
+| 6 | does NOT send Authorization header | Pre-auth call, no bearer. |
+| 7 | preserves InvalidInput error | LB `InvalidInput` / `1001` detail, status, and trace ID remain available in context. |
 
 ### authOtpVerify.test.ts
 
 - **Target:** [src/nodes/authOtpVerify.ts](../src/nodes/authOtpVerify.ts) — POST `/v1/auth/otp/verify`
-- **Suite:** `authOtpVerify node (POST /v1/auth/otp/verify)` · **5 tests**
+- **Suite:** `authOtpVerify node (POST /v1/auth/otp/verify)` · **10 generated tests**
 
 | # | Test | What / how |
 |---|---|---|
 | 1 | calls POST with phone and code | Body `{ phone, code }`. |
 | 2 | signature = SHA256(timestamp + phone + code + salt) | Exact signature with both fields. |
-| 3 | stores accessToken and expiresInSeconds in context | `{ accessToken, expiresInSeconds }`. |
-| 4 | does NOT send Authorization header | Pre-auth call. |
-| 5 | handles API error | 401 → `error.code === 'INVALID_SIGNATURE'`. |
+| 3 | trims phone and code consistently | One normalized pair is signed and transmitted. |
+| 4 | stores PascalCase session response | Access token and expiry are normalized into context. |
+| 5 | stores camelCase sandbox response | Observed sandbox casing is also accepted. |
+| 6-8 | rejects malformed successful session responses | Missing/blank token and zero expiry become stored errors. |
+| 9 | does NOT send Authorization header | Pre-auth call. |
+| 10 | preserves uniform AuthenticationFailed error | LB `AuthenticationFailed` / `1002` remains uniform and machine-readable. |
 
 ---
 
@@ -270,7 +293,7 @@ handling.
 ### getUser.test.ts
 
 - **Target:** [src/nodes/getUser.ts](../src/nodes/getUser.ts) — GET `/v1/user`
-- **Suite:** `getUser node (GET /v1/user)` · **5 tests** · uses a `MOCK_USER` fixture.
+- **Suite:** `getUser node (GET /v1/user)` · **6 generated tests** · uses a `MOCK_USER` fixture.
 
 | # | Test | What / how |
 |---|---|---|
@@ -278,7 +301,7 @@ handling.
 | 2 | signature = SHA256(timestamp + salt) with no extra fields | No signed fields for this endpoint. |
 | 3 | sends Authorization Bearer header | `Authorization: Bearer <token>`. |
 | 4 | stores full user model in context | `UserId`/`Msn` from the response persisted. |
-| 5 | handles API error | 401 → `error` stored. |
+| 5-6 | preserves protected-session errors | `SessionInvalid` / `1004` and `InsufficientScope` / `1005` remain machine-readable. |
 
 ### getStores.test.ts
 
@@ -415,9 +438,9 @@ handling.
 
 ---
 
-## Cross-cutting security suite
+## Cross-cutting security suites
 
-### security.test.ts
+### credential-leakage.test.ts
 
 - **Target:** All 14 nodes, run through the same secret-safety and robustness checks.
 - **7 describe blocks · 21 written test blocks · ~61 expanded cases** (the salt-leak
@@ -436,35 +459,64 @@ handling.
 | Security: header integrity | 4 | Header profiles per node class: `requestSsoToken` (signature headers only); auth nodes (signature + api-key, no bearer); data nodes (signature + api-key + bearer); write nodes (signature + api-key + bearer). |
 | Security: URL injection | 2 | A `javascript:` protocol in `baseUrl` (and in `appBaseUrl`) makes the request fail and the node stores an `error`. |
 
+### outbound-api-security.test.ts
+
+- **Target:** [src/utils/httpClient.ts](../src/utils/httpClient.ts), tested at the
+  outbound Axios request boundary.
+- **13 generated tests:** 9 named test blocks, with the structured hostile-query
+  case expanded across SQL-like, XSS-like, traversal, and CRLF payloads.
+- **How:** `axios-mock-adapter` captures the exact Axios config and simulates an
+  upstream response without sending network traffic.
+
+| OWASP group | Generated cases | What it verifies |
+|---|---:|---|
+| API2 Broken Authentication | 3 | No invented bearer header; supplied tokens exist only in Authorization; whitespace-only tokens are omitted. |
+| API8 Security Misconfiguration | 2 | API key/signature placement and bodyless/content-type-free GET requests. |
+| API10 Unsafe Consumption | 7 | Four structured hostile query values, credential-safe success/error logs, and redaction of OTP/SSO signature fields echoed upstream. |
+| API4 Unrestricted Resource Consumption | 1 | Every outbound request has a positive finite timeout (currently 15 seconds). |
+
+For the full rationale and category applicability, see
+[api-security-test-guide.md](api-security-test-guide.md).
+
 ---
 
 ## Live integration suite
 
-### integration.test.ts
+### live-agent-api.test.ts
 
 - **Target:** The real sandbox API over HTTP (no mocks). Reimplements its own
   signature/header helpers rather than importing from `src`.
 - **Suite:** `Integration: Liquid Barcodes Agent API (sandbox)` · **6 describe sections · 24 tests**
-- **How / gating:** Every section is gated on `process.env` credentials via
-  `HAS_CREDS ? describe : describe.skip` (and nested guards `HAS_OTP_CODE`,
-  `HAS_DURABLE_SSO`, `HAS_APP_CREDS`, `HAS_FULL_SSO`). Without credentials the whole
-  suite is skipped; individual tests also `return` early with `console.warn` when an
-  optional secret is missing.
+- **How / gating:** Every section is declaration-time gated with `describe.skip` or
+  `test.skip`. Missing prerequisites are reported by Jest as skipped tests. Once a
+  section is enabled, request and assertion failures fail the test; they are not
+  converted into warnings.
 
-  > ⚠️ **These tests hit the live sandbox.** They are excluded from
-  > `test:coverage:detailed` / `test:ci` so coverage runs stay deterministic. When
-  > `.env` has credentials but the sandbox/token is stale, this suite will fail
-  > (e.g. SSO exchange returns `undefined`) — that's an environment/credential issue,
-  > not a code regression.
+  > **These tests hit the live sandbox.** They are excluded from `npm test` and all
+  > coverage/CI commands. Run them only with `npm run test:integration`. A stale
+  > credential or contract mismatch fails an enabled test, as intended.
 
 | Section | Tests | What it verifies |
 |---|---|---|
 | Section 1 — Signature validation | 1 | A deliberately wrong signature returns `401 INVALID_SIGNATURE`. |
-| Section 2 — OTP Flow | 4 | `otp/start` sends an OTP to the test phone; empty phone → 400/401; `otp/verify` returns an access token (graceful skip if sandbox OTP not functional); that token fetches `/v1/user`. |
+| Section 2 — OTP Flow | 4 | `otp/start` sends an OTP; empty phone returns an error; `otp/verify` returns a valid session; that token fetches `/v1/user`. The entire stateful section requires `LB_RUN_STATEFUL_OTP_TESTS=true`; verification also requires `LB_AGENT_TEST_OTP_CODE`. |
 | Section 3 — Direct SSO Exchange (durable tokens) | 5 | Exchange a durable SSO token for an access token, then assert the response **shapes** of `/v1/user`, `/v1/stores`, `/v1/stores/machines/status`, `/v1/receipts` (field types + enum values). |
 | Section 3b — Phase 1 write endpoints (signature verification) | 6 | Confirms the inferred signature field order for cancel / get-users / add-user / remove-user / issue-coupon / set-plate is accepted (never `401 INVALID_SIGNATURE`). Uses fake IDs so no real data is mutated; plate-number is read-modify-restore. |
 | Section 4 — App API: SSO Token Generation | 2 | Invalid `UserId` → `ResponseStatus` error; valid `UserId` → a `Token` + `ExpirationDate`. |
 | Section 5 — Full SSO chain (App API → Agent API → data) | 6 | End-to-end: generate SSO token (App API) → exchange for access token → fetch user, stores, machine status, receipts. |
+
+Live execution:
+
+```powershell
+npm run test:integration
+```
+
+Stateful OTP execution, after explicit sandbox approval:
+
+```powershell
+$env:LB_RUN_STATEFUL_OTP_TESTS='true'
+npm run test:integration
+```
 
 ---
 

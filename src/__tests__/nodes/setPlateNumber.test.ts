@@ -1,8 +1,8 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import MockAdapter from 'axios-mock-adapter';
-import { setPlateNumberNode } from '../nodes/setPlateNumber';
-import { createMockParams, TEST_CONNECTION, getNodeFunction } from './helpers';
+import { setPlateNumberNode } from '../../nodes/setPlateNumber';
+import { createMockParams, TEST_CONNECTION, getNodeFunction } from '../helpers';
 
 const execute = getNodeFunction(setPlateNumberNode);
 let mock: MockAdapter;

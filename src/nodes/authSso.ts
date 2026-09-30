@@ -55,6 +55,7 @@ export const authSsoNode = createNodeDescriptor({
   function: async ({ cognigy, config }: INodeFunctionBaseParams) => {
     const { api } = cognigy;
     const { connection, ssoToken, contextKey } = config as any;
+    const normalizedSsoToken = String(ssoToken ?? '').trim();
 
     try {
       const response = await makeAgentApiRequest<ISsoResponse>({
@@ -63,15 +64,18 @@ export const authSsoNode = createNodeDescriptor({
         path: '/v1/auth/sso',
         apiKey: connection.apiKey,
         signatureSalt: connection.signatureSalt,
-        signatureFields: [ssoToken],
-        body: { ssoToken },
+        signatureFields: [normalizedSsoToken],
+        body: { ssoToken: normalizedSsoToken },
         log: (level, message) => api.log?.(level, message),
       });
 
-      const result = {
-        accessToken: response.data.accessToken ?? response.data.AccessToken,
-        expiresInSeconds: response.data.expiresInSeconds ?? response.data.ExpiresInSeconds,
-      };
+      const accessToken = response.data.accessToken ?? response.data.AccessToken;
+      const expiresInSeconds = response.data.expiresInSeconds ?? response.data.ExpiresInSeconds;
+      if (typeof accessToken !== 'string' || !accessToken.trim() || !Number.isFinite(expiresInSeconds) || expiresInSeconds! <= 0) {
+        throw new Error('Liquid Barcodes returned an invalid SSO session response.');
+      }
+
+      const result = { accessToken, expiresInSeconds };
 
       api.addToContext?.(contextKey, result, 'simple');
       api.log?.('info', 'SSO token exchange succeeded');

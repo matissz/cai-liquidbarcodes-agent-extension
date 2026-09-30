@@ -1,4 +1,4 @@
-import { extractApiError } from '../utils/extractApiError';
+import { extractApiError } from '../../utils/extractApiError';
 
 describe('extractApiError', () => {
   describe('RFC problem-details branch (code + detail)', () => {
@@ -8,6 +8,7 @@ describe('extractApiError', () => {
           status: 400,
           data: {
             code: 'INVALID_REQUEST',
+            errorCode: 1001,
             detail: 'The request body was invalid',
             status: 400,
             traceId: 'trace-123',
@@ -18,6 +19,7 @@ describe('extractApiError', () => {
       expect(extractApiError(error)).toEqual({
         message: 'The request body was invalid',
         code: 'INVALID_REQUEST',
+        errorCode: 1001,
         status: 400,
         traceId: 'trace-123',
       });
@@ -31,6 +33,7 @@ describe('extractApiError', () => {
       expect(extractApiError(error)).toEqual({
         message: 'Not allowed',
         code: 'FORBIDDEN',
+        errorCode: undefined,
         status: undefined,
         traceId: undefined,
       });

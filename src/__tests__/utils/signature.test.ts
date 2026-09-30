@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { computeSignature } from '../utils/signature';
+import { computeSignature } from '../../utils/signature';
 
 describe('computeSignature', () => {
   const salt = 'test-salt';
