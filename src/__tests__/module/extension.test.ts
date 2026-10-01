@@ -105,7 +105,9 @@ describe('Extension structure', () => {
       expect(node.function).toBeNull();
     }
     expect(liquidBarcodesOnSuccessNode.defaultLabel).toBe('On Success');
+    expect(liquidBarcodesOnSuccessNode.appearance.color).toBe('#55f855');
     expect(liquidBarcodesOnErrorNode.defaultLabel).toBe('On Error');
+    expect(liquidBarcodesOnErrorNode.appearance.color).toBe('#f7504d');
   });
 
   test('all section field refs match actual field keys', () => {

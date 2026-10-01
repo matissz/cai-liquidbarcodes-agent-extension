@@ -534,6 +534,13 @@ The `message` field contains a human-readable description. `code`, `errorCode`, 
 | `SessionInvalid` / `1004` | 401 | Bearer session is missing, expired, or invalid |
 | `InsufficientScope` / `1005` | 403 | Session does not permit the requested operation |
 
+Treat these values as internal flow-control and diagnostic data. Do not show provider codes,
+HTTP status, trace IDs, or raw provider messages to users. For consistent handling across all
+nodes, map each **On Error** result into the reusable Decision flow described in
+[Cognigy Flow Setup Guide → Built-in Success and Error Routing](cognigy-flow-setup-guide.md#8-built-in-success-and-error-routing).
+The authoritative Decision order, retry safeguards, and OTP anti-enumeration rules are in
+[Success and Error Branching](success-error-branching.md#shared-on-error-handler).
+
 ---
 
 ## Context Key Reference

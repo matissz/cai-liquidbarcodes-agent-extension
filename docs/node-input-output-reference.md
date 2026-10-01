@@ -53,7 +53,8 @@ Every node produces **one of two** possible results:
   {
     "error": {
       "message": "Bearer token is missing, expired, or invalid.",
-      "code": "AUTHENTICATION_FAILED",
+      "code": "AuthenticationFailed",
+      "errorCode": 1002,
       "status": 401
     }
   }
@@ -62,7 +63,8 @@ Every node produces **one of two** possible results:
 > **Important:** Every API node stores its result first, then selects a built-in **On Success**
 > or **On Error** child. Connect both children. Expressions such as
 > `{{context.liquidBarcodesAgent.session.error}}` remain useful inside the Error path for
-> classification, user messaging, and trace correlation.
+> internal classification and trace correlation. Provider error values must not be shown to
+> users. See the [shared On Error handler setup](cognigy-flow-setup-guide.md#8-built-in-success-and-error-routing).
 
 ---
 
@@ -127,7 +129,7 @@ message beneath **On Error**. The following context paths provide details inside
 | Request SSO Token | `context.liquidBarcodesAgent.ssoToken.error` | Stop / show "couldn't verify account" |
 | Exchange SSO Token | `context.liquidBarcodesAgent.session.error` | Stop / show "authentication failed" |
 | Start OTP | `context.liquidBarcodesAgent.otpStart.error` | Stop / re-ask the phone number |
-| Verify OTP | `context.liquidBarcodesAgent.session.error` | Wrong/expired code — re-ask the code |
+| Verify OTP | `context.liquidBarcodesAgent.session.error` | Use the neutral OTP retry/resend route |
 | Get User Profile | `context.liquidBarcodesAgent.user.error` | Stop / show "couldn't load profile" |
 
 ---

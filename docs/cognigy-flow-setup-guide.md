@@ -323,41 +323,112 @@ A typical failure context is:
 {
   "error": {
     "message": "Bearer token is missing, expired, or invalid.",
-    "code": "AUTHENTICATION_FAILED",
+    "code": "AuthenticationFailed",
+    "errorCode": 1002,
     "status": 401
   }
 }
 ```
 
-Connect both children in the flow. Inside **On Error**, these paths remain available for detailed recovery, user messaging, and trace correlation:
+Connect both children in the flow. Route every **On Error** child through the same reusable
+error-handler flow by mapping its node-specific error into
+`context.liquidBarcodesAgent.errorHandling.current` first.
 
-| Extension node | Error expression |
+### Create the shared error envelope
+
+Add a Set Context node immediately beneath each **On Error** child. Replace `current` with:
+
+```json
+{
+  "operation": "verifyOtp",
+  "operationClass": "otpVerify",
+  "sourceContextKey": "liquidBarcodesAgent.session",
+  "error": "{{context.liquidBarcodesAgent.session.error}}"
+}
+```
+
+Use the row for the originating extension node:
+
+| Extension node | `operation` | `operationClass` | Default error expression |
+| --- | --- | --- | --- |
+| Request SSO Token | `requestSsoToken` | `authentication` | `{{context.liquidBarcodesAgent.ssoToken.error}}` |
+| Exchange SSO Token | `exchangeSsoToken` | `authentication` | `{{context.liquidBarcodesAgent.session.error}}` |
+| Start OTP | `startOtp` | `authentication` | `{{context.liquidBarcodesAgent.otpStart.error}}` |
+| Verify OTP | `verifyOtp` | `otpVerify` | `{{context.liquidBarcodesAgent.session.error}}` |
+| Get User Profile | `getUser` | `protectedRead` | `{{context.liquidBarcodesAgent.user.error}}` |
+| Get Stores | `getStores` | `protectedRead` | `{{context.liquidBarcodesAgent.stores.error}}` |
+| Get Machine Status | `getMachineStatus` | `protectedRead` | `{{context.liquidBarcodesAgent.machineStatus.error}}` |
+| Get Receipts | `getReceipts` | `protectedRead` | `{{context.liquidBarcodesAgent.receipts.error}}` |
+| Get Subscription Users | `getSubscriptionUsers` | `protectedRead` | `{{context.liquidBarcodesAgent.subscriptionUsers.error}}` |
+| Add Subscription User | `addSubscriptionUser` | `protectedWrite` | `{{context.liquidBarcodesAgent.addSubscriptionUser.error}}` |
+| Remove Subscription User | `removeSubscriptionUser` | `protectedWrite` | `{{context.liquidBarcodesAgent.removeSubscriptionUser.error}}` |
+| Cancel Subscription | `cancelSubscription` | `protectedWrite` | `{{context.liquidBarcodesAgent.cancelSubscription.error}}` |
+| Set Plate Number | `setPlateNumber` | `protectedWrite` | `{{context.liquidBarcodesAgent.setPlateNumber.error}}` |
+| Issue Coupon | `issueCoupon` | `protectedWrite` | `{{context.liquidBarcodesAgent.issueCoupon.error}}` |
+
+Set `sourceContextKey` to the path without the `context.` prefix and without `.error`. If
+**Store Result In** was customized, use that configured value and its matching error
+expression instead of the default shown above.
+
+After Set Context, call a reusable flow such as **Handle Liquid Barcodes Error**. Keep retry
+state outside `current` at `context.liquidBarcodesAgent.errorHandling.retryState`:
+
+```json
+{
+  "reauthAttempted": false,
+  "operationReplayAttempted": false,
+  "otpAttempts": 0
+}
+```
+
+### Build the shared Decision node
+
+Inside **Handle Liquid Barcodes Error**, configure Decision cases in this order. Treat
+`errorCode` as a string during comparison so numeric and string responses both match.
+
+| Order | Internal branch | Match |
+| ---: | --- | --- |
+| 1 | `CONFIG_SIGNATURE` | `1003`, `InvalidSignature`, or `INVALID_SIGNATURE` |
+| 2 | `INSUFFICIENT_SCOPE` | `1005` or `InsufficientScope` |
+| 3 | `INPUT_INVALID` | `1001`, `InvalidInput`, `BOOTSTRAP_VALIDATION_FAILED`, or remaining status `400` |
+| 4 | `AUTH_RECOVERY` | `1002` or `AuthenticationFailed` |
+| 5 | `SESSION_RECOVERY` | `1004` or `SessionInvalid` |
+| 6 | Status fallback | Remaining status `401`, `403`, `404`, or `409` |
+| 7 | `UNKNOWN_TECHNICAL` | Default branch, including network errors and new provider codes |
+
+Use exact provider `code` comparisons. Do not assume that uppercase codes and numeric codes
+are aliases unless both are listed above. The extension preserves provider values as sent.
+
+Under `AUTH_RECOVERY`, add a second Decision on `operationClass`:
+
+| Operation class | Flow response |
 | --- | --- |
-| Request SSO Token | `{{context.liquidBarcodesAgent.ssoToken.error}}` |
-| Exchange SSO Token or Verify OTP | `{{context.liquidBarcodesAgent.session.error}}` |
-| Start OTP | `{{context.liquidBarcodesAgent.otpStart.error}}` |
-| Get User Profile | `{{context.liquidBarcodesAgent.user.error}}` |
-| Get Stores | `{{context.liquidBarcodesAgent.stores.error}}` |
-| Get Machine Status | `{{context.liquidBarcodesAgent.machineStatus.error}}` |
-| Get Receipts | `{{context.liquidBarcodesAgent.receipts.error}}` |
-| Get Subscription Users | `{{context.liquidBarcodesAgent.subscriptionUsers.error}}` |
-| Add Subscription User | `{{context.liquidBarcodesAgent.addSubscriptionUser.error}}` |
-| Remove Subscription User | `{{context.liquidBarcodesAgent.removeSubscriptionUser.error}}` |
-| Cancel Subscription | `{{context.liquidBarcodesAgent.cancelSubscription.error}}` |
-| Set Plate Number | `{{context.liquidBarcodesAgent.setPlateNumber.error}}` |
-| Issue Coupon | `{{context.liquidBarcodesAgent.issueCoupon.error}}` |
+| `otpVerify` | Show one neutral retry/resend route. Do not identify the underlying OTP failure. |
+| `authentication` | Start a fresh OTP or SSO hand-off with bounded attempts. |
+| `protectedRead` | Reauthenticate once, replay the read once, and stop if authentication fails again. |
+| `protectedWrite` | Reauthenticate once, then refresh/check business state before deciding whether replay is safe. |
 
-Common handling:
+Apply the same read/write safety rule to session loss and ambiguous network failures. Never
+automatically replay a write merely because its response was not received.
 
-| Status or code | Likely cause | Flow response |
-| --- | --- | --- |
-| `400` | Missing, malformed, or invalid node value | Ask for corrected input; do not repeat a write automatically |
-| `401 AUTHENTICATION_FAILED` | Missing or expired access token | Re-authenticate the user |
-| `401 INVALID_SIGNATURE` | Wrong key/salt, wrong environment, or signing-value mismatch | Stop and have an administrator verify the connection |
-| `404` | Incorrect subscription, member, store, user, or schedule identifier | Refresh source data and let the user select again |
-| `409` or business-rule error | Duplicate member, member limit, invalid subscription state, or similar conflict | Explain the returned message and refresh account data |
+### Complete and reset the handler
 
-Do not expose raw backend errors or identifiers to end users. Use the Error child for control flow and the stored error object for classification and log correlation, then show a suitable business-facing message.
+- On recovery success, clear `errorHandling.current` and the operation-specific retry flags
+  before continuing to the original success path.
+- At the beginning of a new top-level user operation, reset stale retry flags.
+- On terminal failure, route to a controlled stop or support path. Never fall through to an
+  API success path.
+- Log `operation`, `code`, `errorCode`, `status`, and `traceId` only through approved,
+  sanitized diagnostics.
+- Never put provider codes, status, trace IDs, raw provider messages, or internal branch
+  labels into conversational output.
+
+For Verify OTP `1002`, use the same neutral user behavior for unknown numbers, wrong or
+expired codes, exhausted attempts, and frozen numbers. A suitable prompt is: "That didn't
+work. Shall I send a new code?"
+
+The complete policy and rationale are in
+[Success and Error Branching](success-error-branching.md#shared-on-error-handler).
 
 Older flow instances created before these children were introduced may not receive them automatically. In that case the node logs a warning and preserves its previous linear successor behavior until the node is recreated or its children are added in Cognigy.
 

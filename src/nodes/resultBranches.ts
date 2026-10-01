@@ -39,7 +39,7 @@ export const liquidBarcodesOnSuccessNode = createNodeDescriptor({
   parentType: [...LIQUID_BARCODES_PARENT_TYPES],
   defaultLabel: 'On Success',
   summary: 'Continue after a successful Liquid Barcodes API operation',
-  appearance: { variant: 'mini' },
+  appearance: { color: '#55f855', variant: 'mini' },
 });
 
 export const liquidBarcodesOnErrorNode = createNodeDescriptor({
@@ -47,5 +47,5 @@ export const liquidBarcodesOnErrorNode = createNodeDescriptor({
   parentType: [...LIQUID_BARCODES_PARENT_TYPES],
   defaultLabel: 'On Error',
   summary: 'Continue after a failed Liquid Barcodes API operation',
-  appearance: { variant: 'mini' },
+  appearance: { color: '#f7504d', variant: 'mini' },
 });
