@@ -1,17 +1,7 @@
-import { requestSsoTokenNode } from '../../nodes/requestSsoToken';
-import { authSsoNode } from '../../nodes/authSso';
 import { authOtpStartNode } from '../../nodes/authOtpStart';
 import { authOtpVerifyNode } from '../../nodes/authOtpVerify';
 import { getUserNode } from '../../nodes/getUser';
-import { getStoresNode } from '../../nodes/getStores';
-import { getStoresMachinesStatusNode } from '../../nodes/getStoresMachinesStatus';
-import { getReceiptsNode } from '../../nodes/getReceipts';
 import { cancelSubscriptionNode } from '../../nodes/cancelSubscription';
-import { getSubscriptionUsersNode } from '../../nodes/getSubscriptionUsers';
-import { addSubscriptionUserNode } from '../../nodes/addSubscriptionUser';
-import { removeSubscriptionUserNode } from '../../nodes/removeSubscriptionUser';
-import { setPlateNumberNode } from '../../nodes/setPlateNumber';
-import { issueCouponNode } from '../../nodes/issueCoupon';
 import {
   LIQUID_BARCODES_PARENT_TYPES,
   RESULT_CHILD_TYPES,
@@ -22,29 +12,19 @@ import { agentApiConnection } from '../../connections/agentApiConnection';
 import extension from '../../module';
 
 const PARENT_NODES = [
-  requestSsoTokenNode,
-  authSsoNode,
   authOtpStartNode,
   authOtpVerifyNode,
   getUserNode,
-  getStoresNode,
-  getStoresMachinesStatusNode,
-  getReceiptsNode,
   cancelSubscriptionNode,
-  getSubscriptionUsersNode,
-  addSubscriptionUserNode,
-  removeSubscriptionUserNode,
-  setPlateNumberNode,
-  issueCouponNode,
 ];
 const CHILD_NODES = [liquidBarcodesOnSuccessNode, liquidBarcodesOnErrorNode];
 const ALL_NODES = [...PARENT_NODES, ...CHILD_NODES];
 
 describe('Extension structure', () => {
-  test('all 14 API parents and two result children are defined', () => {
-    expect(PARENT_NODES).toHaveLength(14);
+  test('four enabled API parents and two result children are defined', () => {
+    expect(PARENT_NODES).toHaveLength(4);
     expect(CHILD_NODES).toHaveLength(2);
-    expect(ALL_NODES).toHaveLength(16);
+    expect(ALL_NODES).toHaveLength(6);
   });
 
   test('extension registers both result children with all API parents', () => {
@@ -53,7 +33,7 @@ describe('Extension structure', () => {
 
   test('all nodes have unique types', () => {
     const types = ALL_NODES.map(n => n.type);
-    expect(new Set(types).size).toBe(16);
+    expect(new Set(types).size).toBe(6);
   });
 
   test('all nodes have a defaultLabel', () => {
