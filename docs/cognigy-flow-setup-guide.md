@@ -381,9 +381,10 @@ state outside `current` at `context.liquidBarcodesAgent.errorHandling.retryState
 }
 ```
 
-### Build the shared Decision node
+### Build the shared If-node chain
 
-Inside **Handle Liquid Barcodes Error**, configure Decision cases in this order. Treat
+Inside **Handle Liquid Barcodes Error**, configure If nodes in this order. Connect each
+**No** branch to the next If node and use the **Yes** branch for the matched handling. Treat
 `errorCode` as a string during comparison so numeric and string responses both match.
 
 | Order | Internal branch | Match |
@@ -399,7 +400,7 @@ Inside **Handle Liquid Barcodes Error**, configure Decision cases in this order.
 Use exact provider `code` comparisons. Do not assume that uppercase codes and numeric codes
 are aliases unless both are listed above. The extension preserves provider values as sent.
 
-Under `AUTH_RECOVERY`, add a second Decision on `operationClass`:
+Under `AUTH_RECOVERY`, add a second If-node chain for `operationClass`:
 
 | Operation class | Flow response |
 | --- | --- |
@@ -429,6 +430,8 @@ work. Shall I send a new code?"
 
 The complete policy and rationale are in
 [Success and Error Branching](success-error-branching.md#shared-on-error-handler).
+For the exact designer layout, Set Context entries, and full If value references, see
+[On Error and If Node Setup](on-error-if-node-setup.md).
 
 Older flow instances created before these children were introduced may not receive them automatically. In that case the node logs a warning and preserves its previous linear successor behavior until the node is recreated or its children are added in Cognigy.
 

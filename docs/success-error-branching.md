@@ -95,7 +95,7 @@ Reset the relevant state after recovery succeeds and when a new top-level user o
 begins. Do not store retry state inside an API result destination because a later API result
 replaces that destination.
 
-## Decision order
+## If-node evaluation order
 
 The shared handler evaluates exact provider information before broad HTTP status fallbacks.
 For comparisons, convert `error.errorCode` to a string so both `1002` and `"1002"` match.

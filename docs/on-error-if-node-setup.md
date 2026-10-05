@@ -68,6 +68,74 @@ Handle Liquid Barcodes Error
 Each **No** child continues to the next If node. Each **Yes** child starts the handling for
 the matched error class. The final **No** child is the mandatory unknown-error fallback.
 
+### What the flow designer should see
+
+In the flow containing an extension API node, the designer creates only two nodes beneath
+**On Error**:
+
+```text
+[Verify OTP]
+  |
+  +-- [On Success] --> normal signed-in flow
+  |
+  +-- [On Error]
+        |
+        +-- [Set Context: Map Verify OTP Error]
+              |
+              +-- [Execute Flow: Handle Liquid Barcodes Error]
+```
+
+The complete If tree belongs inside the reusable **Handle Liquid Barcodes Error** flow. Do
+not duplicate all If nodes beneath every On Error child.
+
+In the shared flow, arrange the If nodes vertically along their **No** branches:
+
+```text
+[If 1: Signature/configuration?]
+  |-- Yes --> [Configuration support] --> [Stop/Return]
+  +-- No
+       |
+       v
+[If 2: Insufficient scope?]
+  |-- Yes --> [Permission support] --> [Stop/Return]
+  +-- No
+       |
+       v
+[If 3: Invalid input?]
+  |-- Yes --> [Return to relevant input] --> [Stop/Return]
+  +-- No
+       |
+       v
+[If 4: Authentication failed?]
+  |-- Yes --> [Operation-class If tree]
+  +-- No
+       |
+       v
+[If 5: Session invalid?]
+  |-- Yes --> [Bounded reauthentication/recovery]
+  +-- No
+       |
+       v
+[If 6: Known HTTP status?]
+  |-- Yes --> [Status-specific If tree]
+  +-- No  --> [Unknown technical failure] --> [Stop/Return]
+```
+
+The labels in square brackets are suggested node labels. **Stop/Return** means the path must
+end or return a controlled result to the calling flow; it must not accidentally continue
+into the original API success path.
+
+### What the flow designer must create
+
+| Location | Designer action | Purpose |
+| --- | --- | --- |
+| Under each API **On Error** | Add one Set Context node | Copy the node-specific error into one shared structure |
+| After that Set Context | Add one Execute Flow node | Call **Handle Liquid Barcodes Error** |
+| In the shared handler flow | Add six ordered If nodes | Classify provider code and HTTP status |
+| Under authentication Yes | Add three operation-class If nodes | Select OTP, authentication, read, or write recovery |
+| Before any retry | Add retry-state If and Set Context nodes | Prevent retry loops |
+| At every terminal branch | Add controlled message, support, return, or stop nodes | Prevent failure paths from reaching success handling |
+
 ## 3. Configure Set Context after On Error
 
 Add **Set Context** immediately below each **On Error** child. Map the source error into:
@@ -123,6 +191,38 @@ For Verify OTP, configure Set Context as:
 
 After Set Context, add **Execute Flow** and select **Handle Liquid Barcodes Error**.
 
+### Cancel Subscription example
+
+For Cancel Subscription, configure Set Context as:
+
+| Context key | Value |
+| --- | --- |
+| `liquidBarcodesAgent.errorHandling.current.operation` | `cancelSubscription` |
+| `liquidBarcodesAgent.errorHandling.current.operationClass` | `protectedWrite` |
+| `liquidBarcodesAgent.errorHandling.current.sourceContextKey` | `liquidBarcodesAgent.cancelSubscription` |
+| `liquidBarcodesAgent.errorHandling.current.error` | `{{context.liquidBarcodesAgent.cancelSubscription.error}}` |
+
+The resulting shared object should look like this during execution:
+
+```json
+{
+  "operation": "cancelSubscription",
+  "operationClass": "protectedWrite",
+  "sourceContextKey": "liquidBarcodesAgent.cancelSubscription",
+  "error": {
+    "message": "Bearer token is missing, expired, or invalid.",
+    "code": "SessionInvalid",
+    "errorCode": 1004,
+    "status": 401,
+    "traceId": "provider-trace-id"
+  }
+}
+```
+
+This example follows the Session Invalid Yes branch. Because the operation class is
+`protectedWrite`, the flow may reauthenticate once but must check current subscription state
+before deciding whether cancellation can be attempted again.
+
 ## 4. Shared paths used by the If nodes
 
 All If nodes in the shared handler read the same mapped object:
@@ -139,6 +239,62 @@ All If nodes in the shared handler read the same mapped object:
 Use `code`, `errorCode`, and `status` only for internal control flow. Keep `traceId` only for
 approved diagnostics.
 
+### Full references versus shorthand
+
+The condition examples below use shorthand such as `error.errorCode`. In Cognigy, select or
+enter the full context reference:
+
+```text
+context.liquidBarcodesAgent.errorHandling.current.error.errorCode
+```
+
+Use this translation throughout the guide:
+
+| Shorthand in this guide | Full value to reference in the If node |
+| --- | --- |
+| `error.code` | `context.liquidBarcodesAgent.errorHandling.current.error.code` |
+| `error.errorCode` | `context.liquidBarcodesAgent.errorHandling.current.error.errorCode` |
+| `error.status` | `context.liquidBarcodesAgent.errorHandling.current.error.status` |
+| `operation` | `context.liquidBarcodesAgent.errorHandling.current.operation` |
+| `operationClass` | `context.liquidBarcodesAgent.errorHandling.current.operationClass` |
+
+For each condition, configure the If node conceptually as:
+
+```text
+Left value:  full context reference
+Operator:    equals
+Right value: expected code, numeric code, status, or operation class
+```
+
+For example, the Authentication Failed If contains one OR group:
+
+```text
+context.liquidBarcodesAgent.errorHandling.current.error.errorCode equals 1002
+OR
+context.liquidBarcodesAgent.errorHandling.current.error.errorCode equals "1002"
+OR
+context.liquidBarcodesAgent.errorHandling.current.error.code equals "AuthenticationFailed"
+```
+
+Use Cognigy's context-value or expression mode for the left side rather than entering the
+path as plain text. Use literal-value mode for values such as `1002`, `401`, and
+`AuthenticationFailed`. The exact control names can differ between Cognigy versions, but the
+left side must resolve from Context and the right side must remain the comparison value.
+
+### Confirm the mapping before building the If tree
+
+Run one known failure and inspect Context in the interaction or debug view. Confirm that:
+
+1. The original API destination contains an `error` object.
+2. `context.liquidBarcodesAgent.errorHandling.current.error` contains the same object after
+  Set Context.
+3. `operation` and `operationClass` contain the expected literal strings.
+4. `error.errorCode` is either a number or string and the If node accounts for its type.
+
+If `current.error` contains text such as `"[object Object]"` or a quoted JSON document, the
+Set Context mapping stored a string instead of the error object. Map the `error` field using
+the direct context expression shown in the source-mapping table.
+
 ## 5. Configure the If chain
 
 Create the If nodes in the order below. Earlier checks are more specific; later checks are
@@ -147,6 +303,14 @@ broad fallbacks. Reordering them can route a specific provider error to a generi
 In each If node, combine the listed alternatives with **OR**. Connect **No** to the next If.
 If Cognigy treats numbers and strings differently, add both numeric and string comparisons
 for `errorCode`, for example `1003` and `"1003"`.
+
+For every If node:
+
+1. Add the first condition using the full Context reference from section 4.
+2. Add the remaining alternatives to the same **OR** group.
+3. Label the **Yes** child with the matched handling category.
+4. Connect the **No** child to the next numbered If node.
+5. Do not add a generic status condition before the provider-specific checks.
 
 ### If 1: Configuration or signature error
 

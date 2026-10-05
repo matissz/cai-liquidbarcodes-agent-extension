@@ -536,9 +536,11 @@ The `message` field contains a human-readable description. `code`, `errorCode`, 
 
 Treat these values as internal flow-control and diagnostic data. Do not show provider codes,
 HTTP status, trace IDs, or raw provider messages to users. For consistent handling across all
-nodes, map each **On Error** result into the reusable Decision flow described in
+nodes, map each **On Error** result into the reusable error-handler flow described in
 [Cognigy Flow Setup Guide → Built-in Success and Error Routing](cognigy-flow-setup-guide.md#8-built-in-success-and-error-routing).
-The authoritative Decision order, retry safeguards, and OTP anti-enumeration rules are in
+The practical If-node layout and exact context references are in
+[On Error and If Node Setup](on-error-if-node-setup.md). The authoritative classification
+order, retry safeguards, and OTP anti-enumeration rules are in
 [Success and Error Branching](success-error-branching.md#shared-on-error-handler).
 
 ---
