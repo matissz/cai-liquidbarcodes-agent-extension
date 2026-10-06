@@ -1,13 +1,13 @@
 # Success and Error Branching
 
-## Decision
+## Result routing
 
-Every Liquid Barcodes API node exposes two shared Cognigy mini children:
+Every Liquid Barcodes API node exposes these Cognigy mini children:
 
 - **On Success** continues after a valid response has been stored in context.
-- **On Error** continues after a normalized error has been stored in context.
+- **On Error** continues after a normalized error and its internal classification have been stored in context.
 
-The two child descriptors are shared by all 14 API nodes. They represent execution outcomes, not endpoint-specific business states.
+The child descriptors are shared by the enabled API nodes. They represent execution outcomes, not endpoint-specific business states.
 
 ## Why branching belongs in the node
 
@@ -27,13 +27,15 @@ On failure it instead:
 
 1. Normalize the provider or network error.
 2. Store `{ error: ... }` in the configured context destination.
-3. Select **On Error**.
+3. Store the common error envelope at `context.liquidBarcodesAgent.errorHandling.current`.
+4. Select **On Error**. A native Cognigy If node can inspect the stored `outcome` value.
 
 Context is deliberately retained. Branches control execution, while context provides response data, error classification, HTTP status, numeric `errorCode`, and `traceId` correlation where supplied by the provider.
 
 ## Compatibility
 
-Newly created parent nodes declare both children as dependencies. Older flow instances may not receive added dependency children automatically. If an expected child is absent, the routing utility logs a warning and leaves Cognigy's existing linear successor unchanged. Recreate or update the node in Cognigy to adopt explicit branches.
+Newly created parent nodes declare only On Success and On Error as dependencies. Recreate
+an existing API node in Cognigy if its generated children do not refresh after an upgrade.
 
 Duplicate children are prevented by the descriptor contract in normal use. If malformed flow configuration contains duplicates, routing selects the first child with the expected descriptor type.
 
@@ -41,7 +43,8 @@ Duplicate children are prevented by the descriptor contract in normal use. If ma
 
 The branch only describes whether the extension accepted a response as successful. In particular, **Start OTP: On Success** means the provider accepted a correctly formed request. It does not confirm that an account exists or that an SMS was delivered. This preserves Liquid Barcodes' OTP anti-enumeration behavior.
 
-Detailed recovery belongs beneath **On Error** and may inspect the stored error. Do not expose raw provider messages, identifiers, or trace values directly to users.
+Detailed recovery belongs beneath On Error and may use a native If node to inspect the stored
+classification. Do not expose raw provider messages, identifiers, or trace values directly to users.
 
 ## Error codes
 
@@ -57,36 +60,34 @@ The documented numeric authentication catalogue is:
 
 The Agent API reference separately uses uppercase `BOOTSTRAP_VALIDATION_FAILED` and `INVALID_SIGNATURE` without numeric mappings. The guides previously used `AUTHENTICATION_FAILED`, but the provider source does not establish that spelling as an alias. The extension preserves upstream codes exactly and does not infer mappings between these vocabularies.
 
-New provider codes do not require new child descriptors. They remain available in context beneath **On Error** for flow-specific handling.
+New provider codes resolve to `technicalError` and remain available in context for flow-specific handling.
 
-## Shared On Error handler
+## Integrated error classifier
 
-Use one reusable Cognigy flow for error handling. The extension runtime remains unchanged:
-each API node stores its error in its configured **Store Result In** destination and then
-selects **On Error**. The flow beneath that child maps the stored error into this flow-owned
-envelope before calling the shared handler:
+The extension stores this envelope before selecting an error outcome:
 
 ```json
 {
   "operation": "verifyOtp",
   "operationClass": "otpVerify",
   "sourceContextKey": "liquidBarcodesAgent.session",
+  "outcome": "authenticationFailed",
   "error": "{{context.liquidBarcodesAgent.session.error}}"
 }
 ```
 
-Store the envelope at `context.liquidBarcodesAgent.errorHandling.current`. Replace it on
-every entry; do not merge it with the previous failure. `sourceContextKey` must match the
-node's configured **Store Result In** value when a flow changes the default.
+The extension replaces `context.liquidBarcodesAgent.errorHandling.current` on every failure
+before routing to On Error.
+`sourceContextKey` contains the node's configured **Store Result In** value.
 
 Use these operation classes:
 
 | Operation class | Use for |
 | --- | --- |
 | `otpVerify` | Verify OTP |
-| `authentication` | Request SSO Token, Exchange SSO Token, and Start OTP |
-| `protectedRead` | Get User Profile, Get Stores, Get Machine Status, Get Receipts, and Get Subscription Users |
-| `protectedWrite` | Cancel Subscription, Add/Remove Subscription User, Set Plate Number, and Issue Coupon |
+| `authentication` | Start OTP |
+| `protectedRead` | Get User Profile |
+| `protectedWrite` | Cancel Subscription |
 
 Keep loop-control state separately at
 `context.liquidBarcodesAgent.errorHandling.retryState`. At minimum track
@@ -95,21 +96,25 @@ Reset the relevant state after recovery succeeds and when a new top-level user o
 begins. Do not store retry state inside an API result destination because a later API result
 replaces that destination.
 
-## If-node evaluation order
+## Classification order
 
-The shared handler evaluates exact provider information before broad HTTP status fallbacks.
+On Error evaluates exact provider information before broad HTTP status fallbacks.
 For comparisons, convert `error.errorCode` to a string so both `1002` and `"1002"` match.
 Preserve the original value for diagnostics and compare `error.code` exactly as supplied.
 
-| Priority | Internal outcome | Match | Handling |
+| Priority | Stored outcome | Match | Handling |
 | ---: | --- | --- | --- |
-| 1 | `CONFIG_SIGNATURE` | `errorCode == "1003"`, `code == "InvalidSignature"`, or `code == "INVALID_SIGNATURE"` | Stop automatic retry and route to configuration support. |
-| 2 | `INSUFFICIENT_SCOPE` | `errorCode == "1005"` or `code == "InsufficientScope"` | Do not repeat the unchanged request; route to permission support. |
-| 3 | `INPUT_INVALID` | `errorCode == "1001"`, `code == "InvalidInput"`, `code == "BOOTSTRAP_VALIDATION_FAILED"`, or otherwise unclassified status `400` | Return to the relevant input step. Never replay a write automatically. |
-| 4 | `AUTH_RECOVERY` | `errorCode == "1002"` or `code == "AuthenticationFailed"` | Apply the operation-class rules below. |
-| 5 | `SESSION_RECOVERY` | `errorCode == "1004"` or `code == "SessionInvalid"` | Reauthenticate; replay only when the operation is safe. |
-| 6 | Status fallback | Unclassified `401`, `403`, `404`, or `409` | Route respectively to authentication, permission, refresh/reselect, or business-conflict handling. |
-| 7 | `UNKNOWN_TECHNICAL` | Missing classification or any new provider code | Stop safely or use a bounded retry only when operation safety is known. |
+| 1 | `invalidSignature` | `errorCode == "1003"`, `code == "InvalidSignature"`, or `code == "INVALID_SIGNATURE"` | Do not retry; check configuration, timestamp handling, and clock drift. |
+| 2 | `insufficientScope` | `errorCode == "1005"` or `code == "InsufficientScope"` | Do not repeat the unchanged request; route to permission support. |
+| 3 | `invalidInput` | `errorCode == "1001"`, `code == "InvalidInput"`, or `code == "BOOTSTRAP_VALIDATION_FAILED"` | Return to the relevant input step. Never replay a write automatically. |
+| 4 | `authenticationFailed` | `errorCode == "1002"` or `code == "AuthenticationFailed"` | Reauthenticate once. If that also fails, stop rather than loop. |
+| 5 | `sessionInvalid` | `errorCode == "1004"` or `code == "SessionInvalid"` | Recover the session; replay only when the operation is safe. |
+| 6 | `badRequest` | Remaining status `400` | Handle an unclassified bad request safely. |
+| 7 | `notFound` | Status `404` | Refresh source data or ask the user to select again. |
+| 8 | `conflict` | Status `409` | Refresh business state before deciding what to do next. |
+| 9 | `unauthorized` | Remaining status `401` | Treat as unclassified authorization failure, not as a specific LB code. |
+| 10 | `forbidden` | Remaining status `403` | Treat as unclassified permission failure. |
+| 11 | `technicalError` | Missing classification, network/server failure, or new provider code | Stop safely or use a bounded retry only when operation safety is known. |
 
 The terminal default branch must not continue into a success path. The internal outcome
 labels are flow-management values; they do not replace provider codes and must not be shown

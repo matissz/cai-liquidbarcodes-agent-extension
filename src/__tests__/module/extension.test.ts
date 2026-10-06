@@ -17,13 +17,13 @@ const PARENT_NODES = [
   getUserNode,
   cancelSubscriptionNode,
 ];
-const CHILD_NODES = [liquidBarcodesOnSuccessNode, liquidBarcodesOnErrorNode];
-const ALL_NODES = [...PARENT_NODES, ...CHILD_NODES];
+const RESULT_NODES = [liquidBarcodesOnSuccessNode, liquidBarcodesOnErrorNode];
+const ALL_NODES = [...PARENT_NODES, ...RESULT_NODES];
 
 describe('Extension structure', () => {
-  test('four enabled API parents and two result children are defined', () => {
+  test('four API parents and two result nodes are defined', () => {
     expect(PARENT_NODES).toHaveLength(4);
-    expect(CHILD_NODES).toHaveLength(2);
+    expect(RESULT_NODES).toHaveLength(2);
     expect(ALL_NODES).toHaveLength(6);
   });
 
@@ -68,7 +68,7 @@ describe('Extension structure', () => {
     }
   });
 
-  test('all API parents create and allow only the shared result children', () => {
+  test('all API parents create On Success and On Error children', () => {
     const expectedTypes = [RESULT_CHILD_TYPES.success, RESULT_CHILD_TYPES.error];
 
     for (const node of PARENT_NODES) {
@@ -77,13 +77,14 @@ describe('Extension structure', () => {
     }
   });
 
-  test('result children are fieldless mini nodes accepted by every API parent', () => {
-    for (const node of CHILD_NODES) {
+  test('result nodes are fieldless mini nodes accepted by every API parent', () => {
+    for (const node of RESULT_NODES) {
       expect(node.appearance.variant).toBe('mini');
       expect(node.parentType).toEqual([...LIQUID_BARCODES_PARENT_TYPES]);
       expect(node.fields).toEqual([]);
-      expect(node.function).toBeNull();
     }
+    expect(liquidBarcodesOnSuccessNode.function).toBeNull();
+    expect(liquidBarcodesOnErrorNode.function).toBeNull();
     expect(liquidBarcodesOnSuccessNode.defaultLabel).toBe('On Success');
     expect(liquidBarcodesOnSuccessNode.appearance.color).toBe('#55f855');
     expect(liquidBarcodesOnErrorNode.defaultLabel).toBe('On Error');

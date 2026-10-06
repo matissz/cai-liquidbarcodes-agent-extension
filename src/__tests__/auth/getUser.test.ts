@@ -119,4 +119,29 @@ describe('getUser node (GET /v1/user)', () => {
       traceId: undefined,
     });
   });
+
+  test('routes a scope failure to On Error and stores its classified outcome', async () => {
+    mock.onGet(`${TEST_CONNECTION.baseUrl}/v1/user`).reply(403, {
+      detail: 'Protected request failed.',
+      code: 'InsufficientScope',
+      errorCode: 1005,
+      status: 403,
+    });
+
+    const { params, contextStore } = createMockParams({
+      connection: TEST_CONNECTION,
+      accessToken: 'bad-tok',
+      contextKey: 'lb.user',
+    });
+    params.childConfigs = [{
+      id: 'error-child',
+      type: 'liquidBarcodesOnError',
+      config: {},
+    }];
+
+    await execute(params);
+
+    expect(params.cognigy.api.setNextNode).toHaveBeenCalledWith('error-child');
+    expect(contextStore['liquidBarcodesAgent.errorHandling.current'].outcome).toBe('insufficientScope');
+  });
 });

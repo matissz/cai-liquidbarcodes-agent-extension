@@ -6,7 +6,10 @@ import { authOtpStartNode } from "./nodes/authOtpStart";
 import { authOtpVerifyNode } from "./nodes/authOtpVerify";
 import { getUserNode } from "./nodes/getUser";
 import { cancelSubscriptionNode } from "./nodes/cancelSubscription";
-import { liquidBarcodesOnErrorNode, liquidBarcodesOnSuccessNode } from './nodes/resultBranches';
+import {
+  liquidBarcodesOnErrorNode,
+  liquidBarcodesOnSuccessNode,
+} from './nodes/resultBranches';
 
 export default createExtension({
   nodes: [

@@ -1,6 +1,7 @@
 import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
 import { makeAgentApiRequest } from '../utils/httpClient';
 import { extractApiError } from '../utils/extractApiError';
+import { storeApiError } from '../utils/errorHandling';
 import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
 import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { IOtpStartResponse } from '../types/agentApi';
@@ -83,7 +84,7 @@ export const authOtpStartNode = createNodeDescriptor({
     } catch (error: any) {
       const apiError = extractApiError(error);
       api.log?.('error', `OTP start failed: ${apiError.message}`);
-      api.addToContext?.(contextKey, { error: apiError }, 'simple');
+      storeApiError(api, contextKey, 'startOtp', 'authentication', apiError);
     }
 
     routeToResultChild(childConfigs, api, route);

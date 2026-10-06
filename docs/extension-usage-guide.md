@@ -518,28 +518,35 @@ Every API node has built-in **On Success** and **On Error** children. The node s
 }
 ```
 
-Inside the **On Error** child, inspect details with a context expression such as:
+The extension also writes the common envelope below, including an `outcome` value, then
+selects On Error:
 
 ```
-{{context.liquidBarcodesAgent.session.error}}
+{{context.liquidBarcodesAgent.errorHandling.current}}
 ```
 
-The `message` field contains a human-readable description. `code`, `errorCode`, `status`, and `traceId` are retained when supplied by the API. Common documented codes include:
+The `message` field contains a human-readable description. `code`, `errorCode`, `status`, and `traceId` are retained when supplied by the API. Route documented Liquid Barcodes failures by numeric `errorCode`, because several categories share HTTP `401`:
 
-| Code | Status | Meaning |
-|---|---|---|
-| `INVALID_SIGNATURE` | 401 | Signature or timestamp is invalid -- check connection credentials |
-| `BOOTSTRAP_VALIDATION_FAILED` | 400 | Request validation failed -- check input fields |
-| `AuthenticationFailed` / `1002` | 401 | OTP verification or authentication failed |
-| `SessionInvalid` / `1004` | 401 | Bearer session is missing, expired, or invalid |
-| `InsufficientScope` / `1005` | 403 | Session does not permit the requested operation |
+| `errorCode` | Code | HTTP | Stored outcome | Handling |
+| ---: | --- | ---: | --- | --- |
+| `1001` | `InvalidInput` | 400 | `invalidInput` | Correct the input. |
+| `1002` | `AuthenticationFailed` | 401 | `authenticationFailed` | Reauthenticate once; do not loop if it fails again. |
+| `1003` | `InvalidSignature` | 401 | `invalidSignature` | Do not retry; check credentials, signature, timestamp, and clock. |
+| `1004` | `SessionInvalid` | 401 | `sessionInvalid` | Recover the session and replay only safe operations. |
+| `1005` | `InsufficientScope` | 403 | `insufficientScope` | Correct endpoint permissions; do not repeat unchanged. |
+
+Compare this value in the Cognigy If node:
+
+```text
+{{context.liquidBarcodesAgent.errorHandling.current.error.errorCode}}
+```
 
 Treat these values as internal flow-control and diagnostic data. Do not show provider codes,
-HTTP status, trace IDs, or raw provider messages to users. For consistent handling across all
-nodes, map each **On Error** result into the reusable error-handler flow described in
+HTTP status, trace IDs, or raw provider messages to users. Connect a native Cognigy If node
+beneath On Error as described in
 [Cognigy Flow Setup Guide → Built-in Success and Error Routing](cognigy-flow-setup-guide.md#8-built-in-success-and-error-routing).
-The practical If-node layout and exact context references are in
-[On Error and If Node Setup](on-error-if-node-setup.md). The authoritative classification
+The practical setup and operation-specific If checks are in
+[On Error Outcome Setup](on-error-if-node-setup.md). The authoritative classification
 order, retry safeguards, and OTP anti-enumeration rules are in
 [Success and Error Branching](success-error-branching.md#shared-on-error-handler).
 

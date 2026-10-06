@@ -312,10 +312,10 @@ Authenticate the recipient, supply a Schedule ID obtained from Liquid Barcodes, 
 
 ## 8. Built-in Success and Error Routing
 
-Each API node automatically selects one of its two child paths after storing context:
+Each API node automatically selects a direct child path after storing context:
 
 - **On Success** is selected after a valid API response has been stored.
-- **On Error** is selected after a normalized error has been stored.
+- **On Error** is selected after a normalized error and its classification have been stored.
 
 A typical failure context is:
 
@@ -330,77 +330,64 @@ A typical failure context is:
 }
 ```
 
-Connect both children in the flow. Route every **On Error** child through the same reusable
-error-handler flow by mapping its node-specific error into
-`context.liquidBarcodesAgent.errorHandling.current` first.
-
-### Create the shared error envelope
-
-Add a Set Context node immediately beneath each **On Error** child. Replace `current` with:
+Connect **On Success** to the normal flow. On failure, the extension also stores a common
+envelope at `context.liquidBarcodesAgent.errorHandling.current`:
 
 ```json
 {
   "operation": "verifyOtp",
   "operationClass": "otpVerify",
   "sourceContextKey": "liquidBarcodesAgent.session",
-  "error": "{{context.liquidBarcodesAgent.session.error}}"
+  "outcome": "authenticationFailed",
+  "error": {
+    "message": "Authentication failed.",
+    "code": "AuthenticationFailed",
+    "errorCode": 1002,
+    "status": 401
+  }
 }
 ```
 
-Use the row for the originating extension node:
+The enabled API nodes supply these operation values automatically:
 
-| Extension node | `operation` | `operationClass` | Default error expression |
-| --- | --- | --- | --- |
-| Request SSO Token | `requestSsoToken` | `authentication` | `{{context.liquidBarcodesAgent.ssoToken.error}}` |
-| Exchange SSO Token | `exchangeSsoToken` | `authentication` | `{{context.liquidBarcodesAgent.session.error}}` |
-| Start OTP | `startOtp` | `authentication` | `{{context.liquidBarcodesAgent.otpStart.error}}` |
-| Verify OTP | `verifyOtp` | `otpVerify` | `{{context.liquidBarcodesAgent.session.error}}` |
-| Get User Profile | `getUser` | `protectedRead` | `{{context.liquidBarcodesAgent.user.error}}` |
-| Get Stores | `getStores` | `protectedRead` | `{{context.liquidBarcodesAgent.stores.error}}` |
-| Get Machine Status | `getMachineStatus` | `protectedRead` | `{{context.liquidBarcodesAgent.machineStatus.error}}` |
-| Get Receipts | `getReceipts` | `protectedRead` | `{{context.liquidBarcodesAgent.receipts.error}}` |
-| Get Subscription Users | `getSubscriptionUsers` | `protectedRead` | `{{context.liquidBarcodesAgent.subscriptionUsers.error}}` |
-| Add Subscription User | `addSubscriptionUser` | `protectedWrite` | `{{context.liquidBarcodesAgent.addSubscriptionUser.error}}` |
-| Remove Subscription User | `removeSubscriptionUser` | `protectedWrite` | `{{context.liquidBarcodesAgent.removeSubscriptionUser.error}}` |
-| Cancel Subscription | `cancelSubscription` | `protectedWrite` | `{{context.liquidBarcodesAgent.cancelSubscription.error}}` |
-| Set Plate Number | `setPlateNumber` | `protectedWrite` | `{{context.liquidBarcodesAgent.setPlateNumber.error}}` |
-| Issue Coupon | `issueCoupon` | `protectedWrite` | `{{context.liquidBarcodesAgent.issueCoupon.error}}` |
+| Extension node | `operation` | `operationClass` |
+| --- | --- | --- |
+| Start OTP | `startOtp` | `authentication` |
+| Verify OTP | `verifyOtp` | `otpVerify` |
+| Get User Profile | `getUser` | `protectedRead` |
+| Cancel Subscription | `cancelSubscription` | `protectedWrite` |
 
-Set `sourceContextKey` to the path without the `context.` prefix and without `.error`. If
-**Store Result In** was customized, use that configured value and its matching error
-expression instead of the default shown above.
+`sourceContextKey` is also assigned automatically from the node's actual **Store Result In**
+value.
 
-After Set Context, call a reusable flow such as **Handle Liquid Barcodes Error**. Keep retry
-state outside `current` at `context.liquidBarcodesAgent.errorHandling.retryState`:
+### Add an If node after On Error
 
-```json
-{
-  "reauthAttempted": false,
-  "operationReplayAttempted": false,
-  "otpAttempts": 0
-}
+Connect a native Cognigy **If** node beneath On Error. For documented Liquid Barcodes
+errors, compare the numeric code first:
+
+```text
+{{context.liquidBarcodesAgent.errorHandling.current.error.errorCode}}
 ```
 
-### Build the shared If-node chain
+HTTP status alone cannot distinguish `1002`, `1003`, and `1004` because all three return
+HTTP `401`.
 
-Inside **Handle Liquid Barcodes Error**, configure If nodes in this order. Connect each
-**No** branch to the next If node and use the **Yes** branch for the matched handling. Treat
-`errorCode` as a string during comparison so numeric and string responses both match.
-
-| Order | Internal branch | Match |
+| `errorCode` | Stored outcome | Handling |
 | ---: | --- | --- |
-| 1 | `CONFIG_SIGNATURE` | `1003`, `InvalidSignature`, or `INVALID_SIGNATURE` |
-| 2 | `INSUFFICIENT_SCOPE` | `1005` or `InsufficientScope` |
-| 3 | `INPUT_INVALID` | `1001`, `InvalidInput`, `BOOTSTRAP_VALIDATION_FAILED`, or remaining status `400` |
-| 4 | `AUTH_RECOVERY` | `1002` or `AuthenticationFailed` |
-| 5 | `SESSION_RECOVERY` | `1004` or `SessionInvalid` |
-| 6 | Status fallback | Remaining status `401`, `403`, `404`, or `409` |
-| 7 | `UNKNOWN_TECHNICAL` | Default branch, including network errors and new provider codes |
+| `1001` | `invalidInput` | Correct invalid input. |
+| `1002` | `authenticationFailed` | Reauthenticate once; if it fails again, stop and treat it as configuration/support. |
+| `1003` | `invalidSignature` | Do not retry; check credentials, signature, timestamp, and clock. |
+| `1004` | `sessionInvalid` | Recover the session; replay only safe operations. |
+| `1005` | `insufficientScope` | Correct endpoint permissions; do not repeat the unchanged request. |
+
+When `errorCode` is absent, compare
+`{{context.liquidBarcodesAgent.errorHandling.current.outcome}}`. Possible fallback values are
+`badRequest`, `unauthorized`, `forbidden`, `notFound`, `conflict`, and `technicalError`.
 
 Use exact provider `code` comparisons. Do not assume that uppercase codes and numeric codes
 are aliases unless both are listed above. The extension preserves provider values as sent.
 
-Under `AUTH_RECOVERY`, add a second If-node chain for `operationClass`:
+Add another native If node when handling must vary by `operationClass`:
 
 | Operation class | Flow response |
 | --- | --- |
@@ -430,10 +417,11 @@ work. Shall I send a new code?"
 
 The complete policy and rationale are in
 [Success and Error Branching](success-error-branching.md#shared-on-error-handler).
-For the exact designer layout, Set Context entries, and full If value references, see
-[On Error and If Node Setup](on-error-if-node-setup.md).
+For the exact designer layout and operation-specific If value references, see
+[On Error Outcome Setup](on-error-if-node-setup.md).
 
-Older flow instances created before these children were introduced may not receive them automatically. In that case the node logs a warning and preserves its previous linear successor behavior until the node is recreated or its children are added in Cognigy.
+Older flow instances may not refresh generated children automatically. Delete and recreate
+the API node after upgrading when On Success or On Error is missing.
 
 ## 9. Diagnostics and Safe Logging
 

@@ -60,10 +60,12 @@ Every node produces **one of two** possible results:
   }
   ```
 
-> **Important:** Every API node stores its result first, then selects a built-in **On Success**
-> or **On Error** child. Connect both children. Expressions such as
-> `{{context.liquidBarcodesAgent.session.error}}` remain useful inside the Error path for
-> internal classification and trace correlation. Provider error values must not be shown to
+> **Important:** Every API node stores its result first, then selects **On Success** or
+> **On Error**. Add a native Cognigy If node beneath On Error and compare
+> `{{context.liquidBarcodesAgent.errorHandling.current.error.errorCode}}` first. Use the
+> stored `outcome` only for errors without a recognized Liquid Barcodes numeric code.
+> `{{context.liquidBarcodesAgent.errorHandling.current}}` contains the common envelope
+> for operation-specific recovery and trace correlation. Provider error values must not be shown to
 > users. See the [shared On Error handler setup](cognigy-flow-setup-guide.md#8-built-in-success-and-error-routing).
 
 ---
@@ -649,9 +651,8 @@ These nodes **change something** in the user's account. They all need a valid lo
 - **Login expires:** Access tokens usually last 1 hour (`expiresInSeconds`). There is **no
   automatic refresh**. If a node returns an authentication error, sign the user in again.
 - **SSO tokens are single-use:** Each token from Request SSO Token can be exchanged only once.
-- **Failures use a dedicated child:** A failed node saves an `error` object and selects its
-  **On Error** child. Older flow instances without that child log a warning and retain their
-  previous linear successor behavior until updated.
+- **Failures use On Error:** A failed node saves an `error` object plus the classified
+  `outcome`, then routes to **On Error**. Use a native Cognigy If node for finer routing.
 - **Rate limits:** Not documented yet — leave reasonable gaps between calls.
 - **Phone format:** Digits only, with country code, no leading `+`.
 - **Identity is phone-only:** In the phone (OTP) path, a phone number + SMS code is the only

@@ -1,6 +1,7 @@
 import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
 import { makeAgentApiRequest } from '../utils/httpClient';
 import { extractApiError } from '../utils/extractApiError';
+import { storeApiError } from '../utils/errorHandling';
 import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
 import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { IOtpVerifyResponse } from '../types/agentApi';
@@ -95,7 +96,7 @@ export const authOtpVerifyNode = createNodeDescriptor({
     } catch (error: any) {
       const apiError = extractApiError(error);
       api.log?.('error', `OTP verification failed: ${apiError.message}`);
-      api.addToContext?.(contextKey, { error: apiError }, 'simple');
+      storeApiError(api, contextKey, 'verifyOtp', 'otpVerify', apiError);
     }
 
     routeToResultChild(childConfigs, api, route);

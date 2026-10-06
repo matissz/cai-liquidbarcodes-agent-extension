@@ -1,6 +1,7 @@
 import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
 import { makeAgentApiRequest } from '../utils/httpClient';
 import { extractApiError } from '../utils/extractApiError';
+import { storeApiError } from '../utils/errorHandling';
 import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
 import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { IWriteOperationResult } from '../types/agentApi';
@@ -130,7 +131,7 @@ export const cancelSubscriptionNode = createNodeDescriptor({
         message: apiError.message,
         traceId: apiError.traceId,
       }));
-      api.addToContext?.(contextKey, { error: apiError }, 'simple');
+      storeApiError(api, contextKey, 'cancelSubscription', 'protectedWrite', apiError);
       api.log?.('info', JSON.stringify({
         event: 'lb.cancel.contextStored',
         contextKey,
