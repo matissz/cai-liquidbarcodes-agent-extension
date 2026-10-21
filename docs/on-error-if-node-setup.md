@@ -44,6 +44,10 @@ HTTP status alone is not sufficiently granular: `1002`, `1003`, and `1004` all u
 | `1003` | `InvalidSignature` | 401 | `invalidSignature` | Do not retry. Check API key, signature configuration, timestamp parsing, and clock drift (allowed window is +/-10 minutes). |
 | `1004` | `SessionInvalid` | 401 | `sessionInvalid` | Recover the lost session. Replay only when the original operation is safe. |
 | `1005` | `InsufficientScope` | 403 | `insufficientScope` | Do not repeat the unchanged request. Correct permissions or endpoint scope. |
+| `90` | `SubscriptionNotFound` | 404 | `subscriptionNotFound` | Do not retry cancellation; refresh user state. |
+| `91` | `InvalidSubscriptionMemberId` | 403 | `notOwner` | Only the owner may cancel; do not retry. |
+| `1008` | `DependencyError` | 502 | `dependencyError` | For cancellation, refresh user state before any retry. |
+| `1009` | `UnexpectedError` | 500 | `unexpectedError` | For cancellation, refresh user state before any retry. |
 
 The extension also stores explicit fallback outcomes when no recognized LB code is supplied:
 
@@ -54,7 +58,12 @@ The extension also stores explicit fallback outcomes when no recognized LB code 
 | `forbidden` | HTTP 403 without recognized LB code |
 | `notFound` | HTTP 404 |
 | `conflict` | HTTP 409 |
-| `technicalError` | Network, server, missing, or unclassified failure |
+| `rateLimited` | HTTP 429; preserve generic `retryAfter` metadata when supplied |
+| `timeout` | Request timed out before a response was received |
+| `networkError` | No HTTP response was received |
+| `technicalError` | Server, malformed, missing, or unclassified failure |
+
+Use `directive` as the primary recovery instruction: `reauthenticateOnce` (bounded by `maxAttempts: 1`), `verifyStateBeforeRetry`, `doNotRetry`, `retryAfter`, or `none`. A successful API call clears the shared current-error envelope.
 
 The `outcome` field is convenient for flow logic, but `error.errorCode` is the authoritative
 granular value for documented Liquid Barcodes errors. The API may supply `errorCode` as a
@@ -76,6 +85,7 @@ Example:
   "operationClass": "protectedRead",
   "sourceContextKey": "liquidBarcodesAgent.user",
   "outcome": "insufficientScope",
+  "directive": "doNotRetry",
   "error": {
     "message": "Insufficient scope.",
     "code": "InsufficientScope",
@@ -95,9 +105,7 @@ The enabled nodes set these operation values automatically:
 | Get User Profile | `getUser` | `protectedRead` |
 | Cancel Subscription | `cancelSubscription` | `protectedWrite` |
 
-Use `operationClass` only when recovery differs by operation. For `1002`, reauthenticate at
-most once; if reauthentication fails, do not loop. Never automatically replay Cancel
-Subscription because the write may have completed even if its response was not received.
+Use `operationClass` only when recovery differs by operation. For `reauthenticateOnce`, authenticate and replay at most once; if either step fails, stop without a loop. For cancellation success, timeout/network, `500/1009`, or `502/1008`, run Get User Profile and inspect fresh state before deciding whether a retry is safe. Never automatically replay Cancel Subscription before that verification because the write may have completed even if its response was not received.
 
 ## Security
 

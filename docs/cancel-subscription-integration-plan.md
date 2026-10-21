@@ -1,6 +1,6 @@
 # Cancel Subscription Integration Plan
 
-**Updated:** October 14, 2026  
+**Updated:** October 21, 2026
 **Milestone:** Deliver and validate the owner-only Cancel Subscription journey in Cognigy  
 **Planning basis:** Confirmed LB answers summarized in [agent-api-cancellation-email-summary.md](./agent-api-cancellation-email-summary.md)
 
@@ -16,7 +16,7 @@ Deliver a Cognigy cancellation flow that authenticates a customer, discovers the
 - Subscription discovery through `GET /v1/user`.
 - Handling of `subscriptions` and `sharedSubscriptions`.
 - Owner/child role handling.
-- Current subscription selection by approved car-wash `planId`, with a controlled `planName` fallback until the plan-ID list is agreed.
+- Current subscription selection only after the approved car-wash `planId` allowlist and deterministic tie-break behavior are agreed.
 - Explicit customer confirmation before the destructive request.
 - Owner cancellation through `POST /v1/subscriptions/cancel`.
 - Post-cancellation verification through `GET /v1/user`.
@@ -31,6 +31,12 @@ Deliver a Cognigy cancellation flow that authenticates a customer, discovers the
 - An idempotency-key implementation, because LB does not support one.
 - Audit-event API integration until `GET /v1/audit-events` is released and included in scope.
 - Unrelated extension use cases.
+
+## Implementation status
+
+Implemented locally: normalized outcomes/directives for all existing API nodes, complete supported Problem Details extraction, stale shared-error clearing, cancellation verification metadata, owner/child relationship types, and automated contract tests. Dormant nodes remain unregistered.
+
+Externally blocked: deterministic car-wash subscription selection (pending plan-ID allowlist/tie-break rule) and all controlled sandbox/state-changing validation (pending LB approval and reset coordination).
 
 ## Work Plan
 
@@ -57,7 +63,7 @@ Implement or document flow logic that:
 5. Rejects child/shared subscriptions before presenting the destructive action.
 6. Handles zero, one, or multiple matching owned subscriptions explicitly rather than selecting an arbitrary item.
 
-**Dependency:** Obtain the production car-wash `planId` allowlist. Use `planName` only as an agreed temporary fallback.
+**Dependency:** Obtain the production car-wash `planId` allowlist and deterministic tie-break behavior. Do not select by `planName` or arbitrary first match.
 
 **Completion evidence:** Tests cover no match, one owner match, child-only match, already-cancelled match, and multiple owner matches.
 

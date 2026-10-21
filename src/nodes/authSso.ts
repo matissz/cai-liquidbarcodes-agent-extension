@@ -1,6 +1,7 @@
 import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
 import { makeAgentApiRequest } from '../utils/httpClient';
 import { extractApiError } from '../utils/extractApiError';
+import { clearApiError, storeApiError } from '../utils/errorHandling';
 import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
 import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { ISsoResponse } from '../types/agentApi';
@@ -84,11 +85,12 @@ export const authSsoNode = createNodeDescriptor({
 
       api.addToContext?.(contextKey, result, 'simple');
       api.log?.('info', 'SSO token exchange succeeded');
+      clearApiError(api);
       route = 'success';
     } catch (error: any) {
       const apiError = extractApiError(error);
       api.log?.('error', `SSO token exchange failed: ${apiError.message}`);
-      api.addToContext?.(contextKey, { error: apiError }, 'simple');
+      storeApiError(api, contextKey, 'authenticateSso', 'authentication', apiError);
     }
 
     routeToResultChild(childConfigs, api, route);

@@ -94,7 +94,16 @@ describe('cancelSubscription node (POST /v1/subscriptions/cancel)', () => {
 
     await execute(params);
 
-    expect(contextStore['lb.cancel'].success).toBe(true);
+    expect(contextStore['lb.cancel']).toEqual({
+      success: true,
+      data: {},
+      verification: {
+        required: true,
+        operation: 'getUser',
+        directive: 'verifyStateBeforeRetry',
+      },
+    });
+    expect(contextStore['liquidBarcodesAgent.errorHandling.current']).toBeNull();
   });
 
   test('logs every cancellation step without exposing credentials', async () => {
@@ -142,6 +151,40 @@ describe('cancelSubscription node (POST /v1/subscriptions/cancel)', () => {
     await execute(params);
 
     expect(contextStore['lb.cancel'].error).toBeDefined();
+  });
+
+  test.each([
+    [403, 'InvalidSubscriptionMemberId', 91, 'notOwner', 'doNotRetry'],
+    [404, 'SubscriptionNotFound', 90, 'subscriptionNotFound', 'doNotRetry'],
+    [401, 'SessionInvalid', 1004, 'sessionInvalid', 'reauthenticateOnce'],
+    [502, 'DependencyError', 1008, 'dependencyError', 'verifyStateBeforeRetry'],
+    [500, 'UnexpectedError', 1009, 'unexpectedError', 'verifyStateBeforeRetry'],
+  ])('normalizes cancellation %s/%s', async (status, code, errorCode, outcome, directive) => {
+    mock.onPost(new RegExp(`${TEST_CONNECTION.baseUrl}/v1/subscriptions/cancel`)).reply(status, {
+      detail: 'Internal diagnostic only.', code, errorCode, status, traceId: 'trace-cancel',
+    });
+    const { params, contextStore } = createMockParams({
+      connection: TEST_CONNECTION, accessToken: 'tok', subscriptionId: '53848', contextKey: 'lb.cancel',
+    });
+
+    await execute(params);
+
+    expect(contextStore['liquidBarcodesAgent.errorHandling.current']).toMatchObject({
+      operation: 'cancelSubscription', operationClass: 'protectedWrite', outcome, directive,
+    });
+  });
+
+  test('normalizes an uncertain network failure as state verification required', async () => {
+    mock.onPost(new RegExp(`${TEST_CONNECTION.baseUrl}/v1/subscriptions/cancel`)).networkError();
+    const { params, contextStore } = createMockParams({
+      connection: TEST_CONNECTION, accessToken: 'tok', subscriptionId: '53848', contextKey: 'lb.cancel',
+    });
+
+    await execute(params);
+
+    expect(contextStore['liquidBarcodesAgent.errorHandling.current']).toMatchObject({
+      outcome: 'networkError', directive: 'verifyStateBeforeRetry',
+    });
   });
 
   test('logs API failure details and trace ID', async () => {

@@ -1,7 +1,7 @@
 import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
 import { makeAgentApiRequest } from '../utils/httpClient';
 import { extractApiError } from '../utils/extractApiError';
-import { storeApiError } from '../utils/errorHandling';
+import { clearApiError, storeApiError } from '../utils/errorHandling';
 import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
 import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { IWriteOperationResult } from '../types/agentApi';
@@ -114,7 +114,16 @@ export const cancelSubscriptionNode = createNodeDescriptor({
         status: response.status,
         subscriptionId: normalizedSubscriptionId,
       }));
-      api.addToContext?.(contextKey, { success: true, data: response.data ?? null }, 'simple');
+      api.addToContext?.(contextKey, {
+        success: true,
+        data: response.data ?? null,
+        verification: {
+          required: true,
+          operation: 'getUser',
+          directive: 'verifyStateBeforeRetry',
+        },
+      }, 'simple');
+      clearApiError(api);
       api.log?.('info', JSON.stringify({
         event: 'lb.cancel.contextStored',
         contextKey,

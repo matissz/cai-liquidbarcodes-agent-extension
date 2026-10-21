@@ -64,9 +64,10 @@ Every node produces **one of two** possible results:
 > **On Error**. Add a native Cognigy If node beneath On Error and compare
 > `{{context.liquidBarcodesAgent.errorHandling.current.error.errorCode}}` first. Use the
 > stored `outcome` only for errors without a recognized Liquid Barcodes numeric code.
-> `{{context.liquidBarcodesAgent.errorHandling.current}}` contains the common envelope
-> for operation-specific recovery and trace correlation. Provider error values must not be shown to
-> users. See the [shared On Error handler setup](cognigy-flow-setup-guide.md#8-built-in-success-and-error-routing).
+> `{{context.liquidBarcodesAgent.errorHandling.current}}` contains the common envelope,
+> including stable `outcome`, `directive`, optional `maxAttempts`, and diagnostic details. Successful
+> calls clear this shared current-error value. Provider `detail`, raw messages, codes, statuses, and
+> trace IDs are internal diagnostics and must not be used as customer-facing copy. See the [shared On Error handler setup](cognigy-flow-setup-guide.md#8-built-in-success-and-error-routing).
 
 ---
 
@@ -528,12 +529,22 @@ These nodes **change something** in the user's account. They all need a valid lo
 ### Output (on success)
 
 ```json
-{ "success": true, "data": null }
+{
+  "success": true,
+  "data": null,
+  "verification": {
+    "required": true,
+    "operation": "getUser",
+    "directive": "verifyStateBeforeRetry"
+  }
+}
 ```
 
 **Limitations / notes**
-- **Cancellation timing is not confirmed** — whether it cancels immediately or at the next
-  renewal date should be checked with Liquid Barcodes.
+- A `200` response has no body and can mean newly cancelled or already inactive. Always run
+  **Get User Profile** and confirm `Cancelled` with `renewalDate`, or absence, before telling the customer.
+- Timeout/network, `500/1009`, and `502/1008` also require state verification before any retry.
+- `403/91` (`notOwner`) and `404/90` (`subscriptionNotFound`) must not be retried.
 - This is a permanent account change. Confirm with the user before running it.
 
 ---

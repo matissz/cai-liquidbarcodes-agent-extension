@@ -1,6 +1,7 @@
 import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
 import { makeAgentApiRequest } from '../utils/httpClient';
 import { extractApiError } from '../utils/extractApiError';
+import { clearApiError, storeApiError } from '../utils/errorHandling';
 import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
 import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { IReceiptsResponse } from '../types/agentApi';
@@ -108,11 +109,12 @@ export const getReceiptsNode = createNodeDescriptor({
       const receipts = response.data.receipts ?? response.data.Receipts ?? [];
       api.addToContext?.(contextKey, response.data, 'simple');
       api.log?.('info', `Get receipts succeeded (${receipts.length} receipts)`);
+      clearApiError(api);
       route = 'success';
     } catch (error: any) {
       const apiError = extractApiError(error);
       api.log?.('error', `Get receipts failed: ${apiError.message}`);
-      api.addToContext?.(contextKey, { error: apiError }, 'simple');
+      storeApiError(api, contextKey, 'getReceipts', 'protectedRead', apiError);
     }
 
     routeToResultChild(childConfigs, api, route);

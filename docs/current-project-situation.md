@@ -1,6 +1,6 @@
 # Current Project Situation
 
-**Last updated:** October 14, 2026  
+**Last updated:** October 21, 2026
 **Current extension version:** 1.2.4
 
 ## Overview
@@ -21,6 +21,11 @@ The extension currently includes a Cancel Subscription node that:
 - Routes execution through success and error child branches.
 - Produces diagnostic logs without exposing credentials.
 - Is covered by automated unit tests.
+- Emits normalized outcomes and flow directives, including bounded one-time reauthentication,
+  deterministic no-retry results, and state verification before retrying uncertain writes.
+- Requires a fresh Get User Profile verification after every successful cancellation response.
+
+All existing source API nodes now use the common error envelope and clear stale shared error state after success. User types preserve owner/child roles plus owned and shared subscription collections. Dormant source nodes have not been newly exposed by the extension module.
 
 The complete cancellation journey must cover more than the API call itself. It depends on correctly authenticating the customer, identifying the relevant subscription, determining whether the customer is authorized to cancel it, handling deterministic cancellation outcomes, and validating the result against suitable sandbox data.
 

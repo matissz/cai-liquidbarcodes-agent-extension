@@ -113,11 +113,33 @@ describe('getUser node (GET /v1/user)', () => {
 
     expect(contextStore['lb.user'].error).toEqual({
       message: 'Protected request failed.',
+      detail: 'Protected request failed.',
       code,
       errorCode,
       status,
-      traceId: undefined,
     });
+  });
+
+  test.each([
+    ['Owner', 'subscriptions'],
+    ['Child', 'sharedSubscriptions'],
+  ])('preserves %s relationship metadata unchanged', async (role, collection) => {
+    const subscription = {
+      role,
+      subscriptionId: role === 'Owner' ? 53848 : 53849,
+      planId: 42,
+      planName: 'Car Wash',
+      subscriptionState: 'Active',
+      renewalDate: '2026-11-01T00:00:00Z',
+    };
+    const payload = { ...MOCK_USER, role, subscriptions: [], sharedSubscriptions: [], [collection]: [subscription] };
+    mock.onGet(`${TEST_CONNECTION.baseUrl}/v1/user`).reply(200, payload);
+    const { params, contextStore } = createMockParams({ connection: TEST_CONNECTION, accessToken: 'tok', contextKey: 'lb.user' });
+
+    await execute(params);
+
+    expect(contextStore['lb.user']).toEqual(payload);
+    expect(contextStore['lb.user'][collection][0]).toEqual(subscription);
   });
 
   test('routes a scope failure to On Error and stores its classified outcome', async () => {

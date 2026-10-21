@@ -140,6 +140,7 @@ describe('authOtpStart node (POST /v1/auth/otp/start)', () => {
 
     expect(contextStore['lb.otp'].error).toEqual({
       message: 'Phone must contain 7 to 13 digits.',
+      detail: 'Phone must contain 7 to 13 digits.',
       code: 'InvalidInput',
       errorCode: 1001,
       status: 400,
@@ -166,6 +167,7 @@ describe('authOtpStart node (POST /v1/auth/otp/start)', () => {
 
     expect(contextStore['lb.otp'].error).toEqual({
       message: 'The request signature is invalid.',
+      detail: 'The request signature is invalid.',
       code: 'InvalidSignature',
       errorCode: 1003,
       status: 401,

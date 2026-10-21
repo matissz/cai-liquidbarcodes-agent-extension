@@ -2,6 +2,8 @@ import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extensio
 import axios from 'axios';
 import { computeSignature } from '../utils/signature';
 import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
+import { extractApiError } from '../utils/extractApiError';
+import { clearApiError, storeApiError } from '../utils/errorHandling';
 import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { ISsoTokenResponse } from '../types/agentApi';
 
@@ -106,24 +108,26 @@ export const requestSsoTokenNode = createNodeDescriptor({
       };
 
       api.addToContext?.(contextKey, result, 'simple');
+      clearApiError(api);
       api.log?.('info', 'SSO token request succeeded');
       route = 'success';
     } catch (error: any) {
       const data = error?.response?.data;
       const rs = data?.responseStatus ?? data?.ResponseStatus;
-      const message = rs?.message ?? rs?.Message ?? data?.detail ?? error?.message ?? 'Unknown error';
-      const code = rs?.errorCode ?? rs?.ErrorCode ?? data?.code;
+      const apiError = extractApiError(error);
+      apiError.message = rs?.message ?? rs?.Message ?? apiError.message;
+      apiError.code = rs?.errorCode ?? rs?.ErrorCode ?? apiError.code;
 
       api.log?.('error', JSON.stringify({
         event: 'lb.appResponse.failed',
         method: 'POST',
         url,
-        status: error?.response?.status,
-        code,
-        message,
-        traceId: data?.traceId,
+        status: apiError.status,
+        code: apiError.code,
+        message: apiError.message,
+        traceId: apiError.traceId,
       }));
-      api.addToContext?.(contextKey, { error: { message, code, status: error?.response?.status } }, 'simple');
+      storeApiError(api, contextKey, 'requestSsoToken', 'appAuthentication', apiError);
     }
 
     routeToResultChild(childConfigs, api, route);

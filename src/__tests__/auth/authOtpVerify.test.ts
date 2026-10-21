@@ -184,6 +184,7 @@ describe('authOtpVerify node (POST /v1/auth/otp/verify)', () => {
 
     expect(contextStore['lb.session'].error).toEqual({
       message: 'Authentication failed.',
+      detail: 'Authentication failed.',
       code: 'AuthenticationFailed',
       errorCode: 1002,
       status: 401,

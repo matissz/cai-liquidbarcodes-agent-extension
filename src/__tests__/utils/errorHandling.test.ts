@@ -17,8 +17,15 @@ describe('Liquid Barcodes error handling', () => {
     [{ error: { message: 'conflict', status: 409 } }, 'conflict'],
     [{ error: { message: 'unauthorized', status: 401 } }, 'unauthorized'],
     [{ error: { message: 'forbidden', status: 403 } }, 'forbidden'],
+    [{ error: { message: 'owner', errorCode: 91, status: 403 } }, 'notOwner'],
+    [{ error: { message: 'missing', errorCode: '90', status: 404 } }, 'subscriptionNotFound'],
+    [{ error: { message: 'dependency', errorCode: 1008, status: 502 } }, 'dependencyError'],
+    [{ error: { message: 'unexpected', errorCode: 1009, status: 500 } }, 'unexpectedError'],
+    [{ error: { message: 'limited', status: 429 } }, 'rateLimited'],
+    [{ error: { message: 'timeout', transportFailure: 'timeout' } }, 'timeout'],
+    [{ error: { message: 'network', transportFailure: 'network' } }, 'networkError'],
     [{ error: { message: 'server', status: 500 } }, 'technicalError'],
-    [{ error: { message: 'network' } }, 'technicalError'],
+    [{ error: { message: 'unknown' } }, 'technicalError'],
     [undefined, 'technicalError'],
   ])('classifies %# into %s', (envelope, expected) => {
     expect(classifyApiError(envelope)).toBe(expected);
@@ -36,6 +43,19 @@ describe('Liquid Barcodes error handling', () => {
     })).toBe(expected);
   });
 
+  test.each([
+    [{ message: 'owner', errorCode: 91, status: 403 }, 'doNotRetry', undefined],
+    [{ message: 'session', errorCode: 1004, status: 401 }, 'reauthenticateOnce', 1],
+    [{ message: 'dependency', errorCode: 1008, status: 502 }, 'verifyStateBeforeRetry', undefined],
+    [{ message: 'timeout', transportFailure: 'timeout' as const }, 'verifyStateBeforeRetry', undefined],
+    [{ message: 'limited', status: 429, retryAfter: '30' }, 'retryAfter', undefined],
+  ])('stores cancellation directive %s', (error, directive, maxAttempts) => {
+    const addToContext = jest.fn();
+    const envelope = storeApiError({ addToContext }, 'lb.cancel', 'cancelSubscription', 'protectedWrite', error);
+    expect(envelope.directive).toBe(directive);
+    expect(envelope.maxAttempts).toBe(maxAttempts);
+  });
+
   test('stores both the local result and common envelope', () => {
     const addToContext = jest.fn();
     const error = { message: 'failed', status: 409 };
@@ -48,6 +68,7 @@ describe('Liquid Barcodes error handling', () => {
       operationClass: 'protectedWrite',
       sourceContextKey: 'lb.cancel',
       outcome: 'conflict',
+      directive: 'doNotRetry',
       error,
     }, 'simple');
   });

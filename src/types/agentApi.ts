@@ -92,16 +92,30 @@ export interface IExternalIdentifier {
   Name: string;
 }
 
+export type SubscriptionRole = 'Owner' | 'Child';
+
 export interface ISubscription {
-  PlanName: string;
-  SubscriptionId: number;
-  SubscriptionState: string;
-  RenewalState: string;
-  ContentId: number;
-  IsMultiUserPlan: boolean;
-  MaxUsersAmount: number;
-  PlanId: number;
+  role?: SubscriptionRole;
+  Role?: SubscriptionRole;
+  planName?: string;
+  PlanName?: string;
+  subscriptionId?: number;
+  SubscriptionId?: number;
+  subscriptionState?: string;
+  SubscriptionState?: string;
+  renewalState?: string;
+  RenewalState?: string;
+  contentId?: number;
+  ContentId?: number;
+  isMultiUserPlan?: boolean;
+  IsMultiUserPlan?: boolean;
+  maxUsersAmount?: number;
+  MaxUsersAmount?: number;
+  planId?: number;
+  PlanId?: number;
+  renewalDate?: string;
   RenewalDate?: string;
+  renewalPrice?: number;
   RenewalPrice?: number;
   DelayedStartDate?: string;
   PeriodBalanceTopUp?: number;
@@ -113,8 +127,10 @@ export interface ISubscription {
 }
 
 export interface IUserResponse {
-  UserId: string;
-  Msn: string;
+  userId?: string;
+  UserId?: string;
+  msn?: string;
+  Msn?: string;
   Name?: string;
   Surname?: string;
   Address?: string;
@@ -128,15 +144,24 @@ export interface IUserResponse {
   SelectedPreferredStores?: number[];
   UserGroups?: IUserGroup[];
   Culture?: string;
-  Consents: IConsentSituation[];
-  UserMyPage: string;
-  RegistrationDate: string;
+  consents?: IConsentSituation[];
+  Consents?: IConsentSituation[];
+  userMyPage?: string;
+  UserMyPage?: string;
+  registrationDate?: string;
+  RegistrationDate?: string;
   PaymentMethods?: IPaymentMethod[];
   PlateNumber?: IPlateNumber;
   ExternalIdentifiers?: IExternalIdentifier[];
-  Subscriptions: ISubscription[];
+  subscriptions?: ISubscription[];
+  Subscriptions?: ISubscription[];
+  sharedSubscriptions?: ISubscription[];
+  SharedSubscriptions?: ISubscription[];
+  role?: SubscriptionRole;
+  Role?: SubscriptionRole;
   ReferralCode?: string;
-  AgeVerifiedBy: string[];
+  ageVerifiedBy?: string[];
+  AgeVerifiedBy?: string[];
 }
 
 // ── Stores ──
@@ -246,14 +271,14 @@ export interface IWriteOperationResult {
 // ── Error ──
 
 export interface IApiProblemDetails {
-  type: string;
-  title: string;
-  status: number;
-  detail: string;
-  instance: string;
-  code: string;
+  type?: string;
+  title?: string;
+  status?: number;
+  detail?: string;
+  instance?: string;
+  code?: string;
   errorCode?: number | string;
-  traceId: string;
+  traceId?: string;
 }
 
 // ── HTTP Client ──

@@ -1,6 +1,7 @@
 import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
 import { makeAgentApiRequest } from '../utils/httpClient';
 import { extractApiError } from '../utils/extractApiError';
+import { clearApiError, storeApiError } from '../utils/errorHandling';
 import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
 import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { IWriteOperationResult } from '../types/agentApi';
@@ -96,11 +97,12 @@ export const removeSubscriptionUserNode = createNodeDescriptor({
 
       api.addToContext?.(contextKey, { success: true, data: response.data ?? null }, 'simple');
       api.log?.('info', 'Remove subscription user succeeded');
+      clearApiError(api);
       route = 'success';
     } catch (error: any) {
       const apiError = extractApiError(error);
       api.log?.('error', `Remove subscription user failed: ${apiError.message}`);
-      api.addToContext?.(contextKey, { error: apiError }, 'simple');
+      storeApiError(api, contextKey, 'removeSubscriptionUser', 'protectedWrite', apiError);
     }
 
     routeToResultChild(childConfigs, api, route);

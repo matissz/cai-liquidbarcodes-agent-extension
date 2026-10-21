@@ -18,6 +18,7 @@ describe('extractApiError', () => {
 
       expect(extractApiError(error)).toEqual({
         message: 'The request body was invalid',
+        detail: 'The request body was invalid',
         code: 'INVALID_REQUEST',
         errorCode: 1001,
         status: 400,
@@ -40,8 +41,8 @@ describe('extractApiError', () => {
 
       expect(extractApiError(error)).toEqual({
         message: 'The request body was invalid.',
+        detail: 'The request body was invalid.',
         code: 'BOOTSTRAP_VALIDATION_FAILED',
-        errorCode: undefined,
         status: 400,
         traceId: 'trace-bootstrap',
       });
@@ -54,10 +55,9 @@ describe('extractApiError', () => {
 
       expect(extractApiError(error)).toEqual({
         message: 'Not allowed',
+        detail: 'Not allowed',
         code: 'FORBIDDEN',
-        errorCode: undefined,
         status: 403,
-        traceId: undefined,
       });
     });
 
@@ -68,7 +68,7 @@ describe('extractApiError', () => {
       };
 
       expect(extractApiError(error)).toEqual({
-        message: 'Request failed with status code 500',
+        message: 'HTTP 500: Request failed with status code 500',
         code: 'ERR',
         errorCode: 1003,
         status: 500,
@@ -101,7 +101,6 @@ describe('extractApiError', () => {
       expect(extractApiError(error)).toEqual({
         message: 'Conflict',
         status: 409,
-        traceId: undefined,
       });
     });
   });
@@ -130,10 +129,27 @@ describe('extractApiError', () => {
   });
 
   describe('bare fallback branch', () => {
-    test('uses error.message when there is no response', () => {
-      const error = new Error('Network Error');
+    test('classifies an Axios no-response failure as network transport failure', () => {
+      const error = { message: 'Network Error', isAxiosError: true, request: {} };
 
-      expect(extractApiError(error)).toEqual({ message: 'Network Error' });
+      expect(extractApiError(error)).toEqual({ message: 'Network Error', transportFailure: 'network' });
+    });
+
+    test('classifies an Axios timeout', () => {
+      expect(extractApiError({ message: 'timeout of 1000ms exceeded', code: 'ECONNABORTED', isAxiosError: true }))
+        .toEqual({ message: 'timeout of 1000ms exceeded', transportFailure: 'timeout' });
+    });
+
+    test('retains instance and retry timing', () => {
+      expect(extractApiError({
+        response: {
+          status: 429,
+          headers: { 'retry-after': '30' },
+          data: { title: 'Limited', instance: '/v1/user', traceId: 'trace-limit' },
+        },
+      })).toEqual({
+        message: 'Limited', status: 429, instance: '/v1/user', traceId: 'trace-limit', retryAfter: '30',
+      });
     });
 
     test('returns "Unknown error" when no message is available', () => {
