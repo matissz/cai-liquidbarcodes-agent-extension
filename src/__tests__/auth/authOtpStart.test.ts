@@ -1,0 +1,177 @@
+import axios from 'axios';
+import crypto from 'crypto';
+import MockAdapter from 'axios-mock-adapter';
+import { authOtpStartNode } from '../../nodes/authOtpStart';
+import { createMockParams, TEST_CONNECTION, getNodeFunction } from '../helpers';
+
+const execute = getNodeFunction(authOtpStartNode);
+let mock: MockAdapter;
+
+beforeEach(() => {
+  mock = new MockAdapter(axios);
+});
+
+afterEach(() => {
+  mock.restore();
+  jest.restoreAllMocks();
+});
+
+describe('authOtpStart node (POST /v1/auth/otp/start)', () => {
+  test('calls POST /v1/auth/otp/start with phone body', async () => {
+    mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/otp/start`).reply(200, {
+      Phone: '34111111111',
+    });
+
+    const { params } = createMockParams({
+      connection: TEST_CONNECTION,
+      phone: '34111111111',
+      contextKey: 'lb.otp',
+    });
+
+    await execute(params);
+
+    const body = JSON.parse(mock.history.post[0].data);
+    expect(body.phone).toBe('34111111111');
+  });
+
+  test('signature = SHA256(timestamp + phone + salt)', async () => {
+    const fixedTime = '2026-01-01T00:00:00.000Z';
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedTime);
+
+    mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/otp/start`).reply(200, {
+      Phone: '34111111111',
+    });
+
+    const { params } = createMockParams({
+      connection: TEST_CONNECTION,
+      phone: '34111111111',
+      contextKey: 'lb.otp',
+    });
+
+    await execute(params);
+
+    const expectedInput = fixedTime + '34111111111' + TEST_CONNECTION.signatureSalt;
+    const expectedSig = crypto.createHash('sha256').update(expectedInput, 'utf8').digest('hex');
+    expect(mock.history.post[0].headers!['X-Liquid-Signature']).toBe(expectedSig);
+  });
+
+  test('trims phone consistently in body and signature', async () => {
+    const fixedTime = '2026-01-01T00:00:00.000Z';
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedTime);
+    mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/otp/start`).reply(200, { phone: '34111111111' });
+
+    const { params } = createMockParams({
+      connection: TEST_CONNECTION,
+      phone: '  34111111111  ',
+      contextKey: 'lb.otp',
+    });
+
+    await execute(params);
+
+    const body = JSON.parse(mock.history.post[0].data);
+    const expectedInput = fixedTime + '34111111111' + TEST_CONNECTION.signatureSalt;
+    const expectedSignature = crypto.createHash('sha256').update(expectedInput, 'utf8').digest('hex');
+    expect(body.phone).toBe('34111111111');
+    expect(mock.history.post[0].headers!['X-Liquid-Signature']).toBe(expectedSignature);
+  });
+
+  test('stores phone response in context', async () => {
+    mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/otp/start`).reply(200, {
+      Phone: '34111111111',
+    });
+
+    const { params, contextStore } = createMockParams({
+      connection: TEST_CONNECTION,
+      phone: '34111111111',
+      contextKey: 'lb.otp',
+    });
+
+    await execute(params);
+
+    expect(contextStore['lb.otp']).toEqual({ phone: '34111111111' });
+  });
+
+  test('stores camelCase sandbox phone response in context', async () => {
+    mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/otp/start`).reply(200, {
+      phone: '34111111111',
+    });
+
+    const { params, contextStore } = createMockParams({
+      connection: TEST_CONNECTION,
+      phone: '34111111111',
+      contextKey: 'lb.otp',
+    });
+
+    await execute(params);
+
+    expect(contextStore['lb.otp']).toEqual({ phone: '34111111111' });
+  });
+
+  test('does NOT send Authorization header', async () => {
+    mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/otp/start`).reply(200, { Phone: '123' });
+
+    const { params } = createMockParams({
+      connection: TEST_CONNECTION,
+      phone: '123',
+      contextKey: 'lb.otp',
+    });
+
+    await execute(params);
+
+    expect(mock.history.post[0].headers!['Authorization']).toBeUndefined();
+  });
+
+  test('preserves InvalidInput format error details', async () => {
+    mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/otp/start`).reply(400, {
+      detail: 'Phone must contain 7 to 13 digits.',
+      code: 'InvalidInput',
+      errorCode: 1001,
+      status: 400,
+      traceId: 'trace-invalid-phone',
+    });
+
+    const { params, contextStore } = createMockParams({
+      connection: TEST_CONNECTION,
+      phone: 'bad',
+      contextKey: 'lb.otp',
+    });
+
+    await execute(params);
+
+    expect(contextStore['lb.otp'].error).toEqual({
+      message: 'Phone must contain 7 to 13 digits.',
+      detail: 'Phone must contain 7 to 13 digits.',
+      code: 'InvalidInput',
+      errorCode: 1001,
+      status: 400,
+      traceId: 'trace-invalid-phone',
+    });
+  });
+
+  test('preserves InvalidSignature error details', async () => {
+    mock.onPost(`${TEST_CONNECTION.baseUrl}/v1/auth/otp/start`).reply(401, {
+      detail: 'The request signature is invalid.',
+      code: 'InvalidSignature',
+      errorCode: 1003,
+      status: 401,
+      traceId: 'trace-invalid-signature',
+    });
+
+    const { params, contextStore } = createMockParams({
+      connection: TEST_CONNECTION,
+      phone: '34111111111',
+      contextKey: 'lb.otp',
+    });
+
+    await execute(params);
+
+    expect(contextStore['lb.otp'].error).toEqual({
+      message: 'The request signature is invalid.',
+      detail: 'The request signature is invalid.',
+      code: 'InvalidSignature',
+      errorCode: 1003,
+      status: 401,
+      traceId: 'trace-invalid-signature',
+    });
+  });
+});

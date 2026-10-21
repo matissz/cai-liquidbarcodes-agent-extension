@@ -1,8 +1,8 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import MockAdapter from 'axios-mock-adapter';
-import { requestSsoTokenNode } from '../nodes/requestSsoToken';
-import { createMockParams, TEST_CONNECTION, getNodeFunction } from './helpers';
+import { requestSsoTokenNode } from '../../nodes/requestSsoToken';
+import { createMockParams, TEST_CONNECTION, getNodeFunction } from '../helpers';
 
 const execute = getNodeFunction(requestSsoTokenNode);
 let mock: MockAdapter;
@@ -77,6 +77,26 @@ describe('requestSsoToken node (POST /auth/lb/tokens)', () => {
     });
   });
 
+  test('stores camelCase token and expirationDate in context', async () => {
+    mock.onPost(`${TEST_CONNECTION.appBaseUrl}/auth/lb/tokens`).reply(200, {
+      token: 'camel-sso-token',
+      expirationDate: '2026-02-15T10:00:00Z',
+    });
+
+    const { params, contextStore } = createMockParams({
+      connection: TEST_CONNECTION,
+      userId: 'user-789',
+      contextKey: 'lb.ssoToken',
+    });
+
+    await execute(params);
+
+    expect(contextStore['lb.ssoToken']).toEqual({
+      token: 'camel-sso-token',
+      expirationDate: '2026-02-15T10:00:00Z',
+    });
+  });
+
   test('does NOT send X-Customer-Api-Key header', async () => {
     mock.onPost(`${TEST_CONNECTION.appBaseUrl}/auth/lb/tokens`).reply(200, {
       Token: 'tok',
@@ -127,6 +147,35 @@ describe('requestSsoToken node (POST /auth/lb/tokens)', () => {
 
     expect(mock.history.post[0].headers!['X-Liquid-Signature']).toMatch(/^[0-9a-f]{64}$/);
     expect(mock.history.post[0].headers!['X-Liquid-Timestamp']).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  test('logs sanitized App API request lifecycle events', async () => {
+    const appSecretKey = 'secret-that-must-not-be-logged';
+    const userId = 'user-that-must-not-be-logged';
+    const token = 'token-that-must-not-be-logged';
+    const connection = { ...TEST_CONNECTION, appSecretKey };
+
+    mock.onPost(`${TEST_CONNECTION.appBaseUrl}/auth/lb/tokens`).reply(200, {
+      Token: token,
+      ExpirationDate: '2026-01-27T15:25:36Z',
+    });
+
+    const { params, logs } = createMockParams({
+      connection,
+      userId,
+      contextKey: 'lb.ssoToken',
+    });
+
+    await execute(params);
+
+    const serializedLogs = JSON.stringify(logs);
+    expect(serializedLogs).toContain('lb.appRequest.prepared');
+    expect(serializedLogs).toContain('lb.appRequest.sending');
+    expect(serializedLogs).toContain('lb.appResponse.received');
+    expect(serializedLogs).not.toContain(appSecretKey);
+    expect(serializedLogs).not.toContain(userId);
+    expect(serializedLogs).not.toContain(token);
+    expect(serializedLogs).not.toContain(mock.history.post[0].headers!['X-Liquid-Signature'] as string);
   });
 
   test('handles App API error (ResponseStatus format)', async () => {

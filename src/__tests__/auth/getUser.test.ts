@@ -1,8 +1,8 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import MockAdapter from 'axios-mock-adapter';
-import { getUserNode } from '../nodes/getUser';
-import { createMockParams, TEST_CONNECTION, getNodeFunction } from './helpers';
+import { getUserNode } from '../../nodes/getUser';
+import { createMockParams, TEST_CONNECTION, getNodeFunction } from '../helpers';
 
 const execute = getNodeFunction(getUserNode);
 let mock: MockAdapter;
@@ -92,10 +92,15 @@ describe('getUser node (GET /v1/user)', () => {
     expect(contextStore['lb.user'].Msn).toBe(MOCK_USER.Msn);
   });
 
-  test('handles API error', async () => {
-    mock.onGet(`${TEST_CONNECTION.baseUrl}/v1/user`).reply(401, {
-      detail: 'Authentication failed.',
-      code: 'INVALID_SIGNATURE',
+  test.each([
+    ['SessionInvalid', 1004, 401],
+    ['InsufficientScope', 1005, 403],
+  ])('preserves %s protected-session error', async (code, errorCode, status) => {
+    mock.onGet(`${TEST_CONNECTION.baseUrl}/v1/user`).reply(status, {
+      detail: 'Protected request failed.',
+      code,
+      errorCode,
+      status,
     });
 
     const { params, contextStore } = createMockParams({
@@ -106,6 +111,59 @@ describe('getUser node (GET /v1/user)', () => {
 
     await execute(params);
 
-    expect(contextStore['lb.user'].error).toBeDefined();
+    expect(contextStore['lb.user'].error).toEqual({
+      message: 'Protected request failed.',
+      detail: 'Protected request failed.',
+      code,
+      errorCode,
+      status,
+    });
+  });
+
+  test.each([
+    ['Owner', 'subscriptions'],
+    ['Child', 'sharedSubscriptions'],
+  ])('preserves %s relationship metadata unchanged', async (role, collection) => {
+    const subscription = {
+      role,
+      subscriptionId: role === 'Owner' ? 53848 : 53849,
+      planId: 42,
+      planName: 'Car Wash',
+      subscriptionState: 'Active',
+      renewalDate: '2026-11-01T00:00:00Z',
+    };
+    const payload = { ...MOCK_USER, role, subscriptions: [], sharedSubscriptions: [], [collection]: [subscription] };
+    mock.onGet(`${TEST_CONNECTION.baseUrl}/v1/user`).reply(200, payload);
+    const { params, contextStore } = createMockParams({ connection: TEST_CONNECTION, accessToken: 'tok', contextKey: 'lb.user' });
+
+    await execute(params);
+
+    expect(contextStore['lb.user']).toEqual(payload);
+    expect(contextStore['lb.user'][collection][0]).toEqual(subscription);
+  });
+
+  test('routes a scope failure to On Error and stores its classified outcome', async () => {
+    mock.onGet(`${TEST_CONNECTION.baseUrl}/v1/user`).reply(403, {
+      detail: 'Protected request failed.',
+      code: 'InsufficientScope',
+      errorCode: 1005,
+      status: 403,
+    });
+
+    const { params, contextStore } = createMockParams({
+      connection: TEST_CONNECTION,
+      accessToken: 'bad-tok',
+      contextKey: 'lb.user',
+    });
+    params.childConfigs = [{
+      id: 'error-child',
+      type: 'liquidBarcodesOnError',
+      config: {},
+    }];
+
+    await execute(params);
+
+    expect(params.cognigy.api.setNextNode).toHaveBeenCalledWith('error-child');
+    expect(contextStore['liquidBarcodesAgent.errorHandling.current'].outcome).toBe('insufficientScope');
   });
 });

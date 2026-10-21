@@ -5,8 +5,10 @@ export interface ISsoTokenRequest {
 }
 
 export interface ISsoTokenResponse {
-  Token: string;
-  ExpirationDate: string;
+  Token?: string;
+  token?: string;
+  ExpirationDate?: string;
+  expirationDate?: string;
 }
 
 export interface ISsoRequest {
@@ -14,8 +16,10 @@ export interface ISsoRequest {
 }
 
 export interface ISsoResponse {
-  AccessToken: string;
-  ExpiresInSeconds: number;
+  AccessToken?: string;
+  accessToken?: string;
+  ExpiresInSeconds?: number;
+  expiresInSeconds?: number;
 }
 
 export interface IOtpStartRequest {
@@ -23,7 +27,8 @@ export interface IOtpStartRequest {
 }
 
 export interface IOtpStartResponse {
-  Phone: string;
+  Phone?: string;
+  phone?: string;
 }
 
 export interface IOtpVerifyRequest {
@@ -32,8 +37,10 @@ export interface IOtpVerifyRequest {
 }
 
 export interface IOtpVerifyResponse {
-  AccessToken: string;
-  ExpiresInSeconds: number;
+  AccessToken?: string;
+  accessToken?: string;
+  ExpiresInSeconds?: number;
+  expiresInSeconds?: number;
 }
 
 // ── User ──
@@ -85,16 +92,30 @@ export interface IExternalIdentifier {
   Name: string;
 }
 
+export type SubscriptionRole = 'Owner' | 'Child';
+
 export interface ISubscription {
-  PlanName: string;
-  SubscriptionId: number;
-  SubscriptionState: string;
-  RenewalState: string;
-  ContentId: number;
-  IsMultiUserPlan: boolean;
-  MaxUsersAmount: number;
-  PlanId: number;
+  role?: SubscriptionRole;
+  Role?: SubscriptionRole;
+  planName?: string;
+  PlanName?: string;
+  subscriptionId?: number;
+  SubscriptionId?: number;
+  subscriptionState?: string;
+  SubscriptionState?: string;
+  renewalState?: string;
+  RenewalState?: string;
+  contentId?: number;
+  ContentId?: number;
+  isMultiUserPlan?: boolean;
+  IsMultiUserPlan?: boolean;
+  maxUsersAmount?: number;
+  MaxUsersAmount?: number;
+  planId?: number;
+  PlanId?: number;
+  renewalDate?: string;
   RenewalDate?: string;
+  renewalPrice?: number;
   RenewalPrice?: number;
   DelayedStartDate?: string;
   PeriodBalanceTopUp?: number;
@@ -106,8 +127,10 @@ export interface ISubscription {
 }
 
 export interface IUserResponse {
-  UserId: string;
-  Msn: string;
+  userId?: string;
+  UserId?: string;
+  msn?: string;
+  Msn?: string;
   Name?: string;
   Surname?: string;
   Address?: string;
@@ -121,15 +144,24 @@ export interface IUserResponse {
   SelectedPreferredStores?: number[];
   UserGroups?: IUserGroup[];
   Culture?: string;
-  Consents: IConsentSituation[];
-  UserMyPage: string;
-  RegistrationDate: string;
+  consents?: IConsentSituation[];
+  Consents?: IConsentSituation[];
+  userMyPage?: string;
+  UserMyPage?: string;
+  registrationDate?: string;
+  RegistrationDate?: string;
   PaymentMethods?: IPaymentMethod[];
   PlateNumber?: IPlateNumber;
   ExternalIdentifiers?: IExternalIdentifier[];
-  Subscriptions: ISubscription[];
+  subscriptions?: ISubscription[];
+  Subscriptions?: ISubscription[];
+  sharedSubscriptions?: ISubscription[];
+  SharedSubscriptions?: ISubscription[];
+  role?: SubscriptionRole;
+  Role?: SubscriptionRole;
   ReferralCode?: string;
-  AgeVerifiedBy: string[];
+  ageVerifiedBy?: string[];
+  AgeVerifiedBy?: string[];
 }
 
 // ── Stores ──
@@ -155,7 +187,8 @@ export interface IStore {
 }
 
 export interface IStoresResponse {
-  Stores: IStore[];
+  Stores?: IStore[];
+  stores?: IStore[];
 }
 
 export interface IStoreMachine {
@@ -174,7 +207,8 @@ export interface IStoreMachineStatus {
 }
 
 export interface IStoreMachinesStatusResponse {
-  StoreMachinesStatus: IStoreMachineStatus[];
+  StoreMachinesStatus?: IStoreMachineStatus[];
+  storeMachinesStatus?: IStoreMachineStatus[];
 }
 
 // ── Receipts ──
@@ -186,26 +220,71 @@ export interface IReceipt {
 }
 
 export interface IReceiptsResponse {
-  Logo: string;
-  Receipts: IReceipt[];
+  Logo?: string;
+  logo?: string;
+  Receipts?: IReceipt[];
+  receipts?: IReceipt[];
+}
+
+// ── Subscription management ──
+
+export interface ICancelSubscriptionRequest {
+  subscriptionId: number;
+}
+
+export interface ISubscriptionUser {
+  Id?: number;
+  PersonalIdentifier?: string;
+  Name?: string;
+  [key: string]: any;
+}
+
+export interface ISubscriptionUsersResponse {
+  Users?: ISubscriptionUser[];
+  users?: ISubscriptionUser[];
+  [key: string]: any;
+}
+
+export interface IAddSubscriptionUserRequest {
+  personalIdentifier: string;
+}
+
+// ── Profile updates ──
+
+export interface ISetPlateNumberRequest {
+  plateNumber: string;
+}
+
+// ── Coupons ──
+
+export interface IIssueCouponRequest {
+  scheduleId: number;
+  expirationDate?: string;
+  transactionId?: string;
+}
+
+/** Endpoints that return `200 OK` with no documented response body. */
+export interface IWriteOperationResult {
+  [key: string]: any;
 }
 
 // ── Error ──
 
 export interface IApiProblemDetails {
-  type: string;
-  title: string;
-  status: number;
-  detail: string;
-  instance: string;
-  code: string;
-  traceId: string;
+  type?: string;
+  title?: string;
+  status?: number;
+  detail?: string;
+  instance?: string;
+  code?: string;
+  errorCode?: number | string;
+  traceId?: string;
 }
 
 // ── HTTP Client ──
 
 export interface IAgentApiRequestOptions {
-  method: 'GET' | 'POST';
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   baseUrl: string;
   path: string;
   apiKey: string;
@@ -214,6 +293,7 @@ export interface IAgentApiRequestOptions {
   accessToken?: string;
   body?: Record<string, any>;
   queryParams?: Record<string, string>;
+  log?: (level: 'info' | 'error', message: string) => void;
 }
 
 export interface IAgentApiResponse<T = any> {

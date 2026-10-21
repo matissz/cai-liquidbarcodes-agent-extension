@@ -1,12 +1,17 @@
 import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
 import { makeAgentApiRequest } from '../utils/httpClient';
 import { extractApiError } from '../utils/extractApiError';
+import { clearApiError, storeApiError } from '../utils/errorHandling';
+import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
+import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { IOtpStartResponse } from '../types/agentApi';
 
 export const authOtpStartNode = createNodeDescriptor({
   type: "authOtpStart",
   defaultLabel: "Start OTP",
   summary: "Send OTP code via SMS to a phone number",
+  constraints: RESULT_CHILD_CONSTRAINTS,
+  dependencies: RESULT_CHILD_DEPENDENCIES,
 
   fields: [
     {
@@ -51,9 +56,11 @@ export const authOtpStartNode = createNodeDescriptor({
     { type: "section", key: "output" },
   ],
 
-  function: async ({ cognigy, config }: INodeFunctionBaseParams) => {
+  function: async ({ cognigy, config, childConfigs }: INodeFunctionBaseParams) => {
     const { api } = cognigy;
     const { connection, phone, contextKey } = config as any;
+    const normalizedPhone = String(phone ?? '').trim();
+    let route: ResultRoute = 'error';
 
     try {
       const response = await makeAgentApiRequest<IOtpStartResponse>({
@@ -62,20 +69,25 @@ export const authOtpStartNode = createNodeDescriptor({
         path: '/v1/auth/otp/start',
         apiKey: connection.apiKey,
         signatureSalt: connection.signatureSalt,
-        signatureFields: [phone],
-        body: { phone },
+        signatureFields: [normalizedPhone],
+        body: { phone: normalizedPhone },
+        log: (level, message) => api.log?.(level, message),
       });
 
       const result = {
-        phone: response.data.Phone,
+        phone: response.data.phone ?? response.data.Phone ?? normalizedPhone,
       };
 
       api.addToContext?.(contextKey, result, 'simple');
       api.log?.('info', 'OTP start succeeded');
+      clearApiError(api);
+      route = 'success';
     } catch (error: any) {
       const apiError = extractApiError(error);
       api.log?.('error', `OTP start failed: ${apiError.message}`);
-      api.addToContext?.(contextKey, { error: apiError }, 'simple');
+      storeApiError(api, contextKey, 'startOtp', 'authentication', apiError);
     }
+
+    routeToResultChild(childConfigs, api, route);
   },
 });

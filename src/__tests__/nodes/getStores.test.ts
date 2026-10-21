@@ -1,8 +1,8 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import MockAdapter from 'axios-mock-adapter';
-import { getStoresNode } from '../nodes/getStores';
-import { createMockParams, TEST_CONNECTION, getNodeFunction } from './helpers';
+import { getStoresNode } from '../../nodes/getStores';
+import { createMockParams, TEST_CONNECTION, getNodeFunction } from '../helpers';
 
 const execute = getNodeFunction(getStoresNode);
 let mock: MockAdapter;
@@ -122,6 +122,27 @@ describe('getStores node (GET /v1/stores)', () => {
     await execute(params);
 
     expect(contextStore['lb.stores'].Stores).toHaveLength(2);
+  });
+
+  test('stores camelCase response and logs the correct store count', async () => {
+    const camelCaseResponse = {
+      stores: [
+        { id: 22765, externalId: 12313, name: 'Green Ray', currentState: 'Open' },
+      ],
+    };
+    mock.onGet(new RegExp(`${TEST_CONNECTION.baseUrl}/v1/stores`)).reply(200, camelCaseResponse);
+
+    const { params, contextStore, logs } = createMockParams({
+      connection: TEST_CONNECTION,
+      accessToken: 'tok',
+      storeId: '',
+      contextKey: 'lb.stores',
+    });
+
+    await execute(params);
+
+    expect(contextStore['lb.stores']).toEqual(camelCaseResponse);
+    expect(logs.some(log => log.message === 'Get stores succeeded (1 stores)')).toBe(true);
   });
 
   test('handles API error', async () => {

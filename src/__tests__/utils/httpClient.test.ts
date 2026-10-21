@@ -1,6 +1,6 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
-import { makeAgentApiRequest } from '../utils/httpClient';
+import { makeAgentApiRequest } from '../../utils/httpClient';
 
 let mock: MockAdapter;
 
@@ -165,5 +165,33 @@ describe('makeAgentApiRequest', () => {
         body: { ssoToken: 'bad' },
       })
     ).rejects.toThrow();
+  });
+
+  test('logs failure diagnostics without exposing credentials', async () => {
+    const logs: string[] = [];
+    mock.onPost(`${BASE_URL}/v1/auth/otp/start`).reply(401, {
+      status: 401,
+      detail: 'The request could not be authenticated.',
+      code: 'AuthenticationFailed',
+      traceId: '00-test-trace-01',
+    });
+
+    await expect(makeAgentApiRequest({
+      method: 'POST',
+      baseUrl: `${BASE_URL}/`,
+      path: '/v1/auth/otp/start',
+      apiKey: 'secret-api-key',
+      signatureSalt: 'secret-signature-salt',
+      signatureFields: ['34111111111'],
+      body: { phone: '34111111111' },
+      log: (_level, message) => logs.push(message),
+    })).rejects.toThrow();
+
+    const output = logs.join('\n');
+    expect(output).toContain('AuthenticationFailed');
+    expect(output).toContain('00-test-trace-01');
+    expect(output).not.toContain('secret-api-key');
+    expect(output).not.toContain('secret-signature-salt');
+    expect(output).not.toContain('34111111111');
   });
 });

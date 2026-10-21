@@ -1,12 +1,18 @@
 import { createNodeDescriptor, INodeFunctionBaseParams } from "@cognigy/extension-tools";
 import axios from 'axios';
 import { computeSignature } from '../utils/signature';
+import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
+import { extractApiError } from '../utils/extractApiError';
+import { clearApiError, storeApiError } from '../utils/errorHandling';
+import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { ISsoTokenResponse } from '../types/agentApi';
 
 export const requestSsoTokenNode = createNodeDescriptor({
   type: "requestSsoToken",
   defaultLabel: "Request SSO Token",
   summary: "Generate an SSO token for a user via the App API",
+  constraints: RESULT_CHILD_CONSTRAINTS,
+  dependencies: RESULT_CHILD_DEPENDENCIES,
 
   fields: [
     {
@@ -51,38 +57,79 @@ export const requestSsoTokenNode = createNodeDescriptor({
     { type: "section", key: "output" },
   ],
 
-  function: async ({ cognigy, config }: INodeFunctionBaseParams) => {
+  function: async ({ cognigy, config, childConfigs }: INodeFunctionBaseParams) => {
     const { api } = cognigy;
     const { connection, userId, contextKey } = config as any;
+    const normalizedAppBaseUrl = String(connection?.appBaseUrl ?? '').trim().replace(/\/+$/, '');
+    const normalizedAppSecretKey = String(connection?.appSecretKey ?? '').trim();
+    const normalizedUserId = String(userId ?? '').trim();
+    const url = `${normalizedAppBaseUrl}/auth/lb/tokens`;
+    let route: ResultRoute = 'error';
 
     try {
       const timestamp = new Date().toISOString();
-      const signature = computeSignature(timestamp, [userId], connection.appSecretKey);
+      const signature = computeSignature(timestamp, [normalizedUserId], normalizedAppSecretKey);
 
-      const url = `${connection.appBaseUrl}/auth/lb/tokens`;
       const headers: Record<string, string> = {
         'X-Liquid-Timestamp': timestamp,
         'X-Liquid-Signature': signature,
         'Content-Type': 'application/json',
       };
 
-      const response = await axios.post<ISsoTokenResponse>(url, { UserId: userId }, { headers });
+      api.log?.('info', JSON.stringify({
+        event: 'lb.appRequest.prepared',
+        method: 'POST',
+        url,
+        timestamp,
+        appSecretKeyPresent: normalizedAppSecretKey.length > 0,
+        appSecretKeyLength: normalizedAppSecretKey.length,
+        userIdLength: normalizedUserId.length,
+        signatureLength: signature.length,
+      }));
+      api.log?.('info', JSON.stringify({
+        event: 'lb.appRequest.sending',
+        method: 'POST',
+        url,
+        headerNames: Object.keys(headers),
+      }));
+
+      const response = await axios.post<ISsoTokenResponse>(url, { UserId: normalizedUserId }, { headers });
+
+      api.log?.('info', JSON.stringify({
+        event: 'lb.appResponse.received',
+        method: 'POST',
+        url,
+        status: response.status,
+      }));
 
       const result = {
-        token: response.data.Token,
-        expirationDate: response.data.ExpirationDate,
+        token: response.data.token ?? response.data.Token,
+        expirationDate: response.data.expirationDate ?? response.data.ExpirationDate,
       };
 
       api.addToContext?.(contextKey, result, 'simple');
+      clearApiError(api);
       api.log?.('info', 'SSO token request succeeded');
+      route = 'success';
     } catch (error: any) {
       const data = error?.response?.data;
-      const rs = data?.ResponseStatus;
-      const message = rs?.Message || data?.detail || error?.message || 'Unknown error';
-      const code = rs?.ErrorCode || data?.code;
+      const rs = data?.responseStatus ?? data?.ResponseStatus;
+      const apiError = extractApiError(error);
+      apiError.message = rs?.message ?? rs?.Message ?? apiError.message;
+      apiError.code = rs?.errorCode ?? rs?.ErrorCode ?? apiError.code;
 
-      api.log?.('error', `SSO token request failed: ${message}`);
-      api.addToContext?.(contextKey, { error: { message, code, status: error?.response?.status } }, 'simple');
+      api.log?.('error', JSON.stringify({
+        event: 'lb.appResponse.failed',
+        method: 'POST',
+        url,
+        status: apiError.status,
+        code: apiError.code,
+        message: apiError.message,
+        traceId: apiError.traceId,
+      }));
+      storeApiError(api, contextKey, 'requestSsoToken', 'appAuthentication', apiError);
     }
+
+    routeToResultChild(childConfigs, api, route);
   },
 });

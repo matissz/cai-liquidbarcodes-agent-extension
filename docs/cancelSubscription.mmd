@@ -1,0 +1,60 @@
+---
+config:
+    flowchart:
+        curve: monotoneY
+---
+flowchart TD
+    subgraph Customer
+        Start([Customer initiates query via chatbot])
+        AlternateNumber[Provide alternate mobile number]
+        Reason[Provide reason for cancellation]
+        Confirm{Confirm cancellation?}
+        WebForm[Fill and submit web form]
+        End([Request complete])
+    end
+
+    subgraph MobileApp[Mobile App]
+        Identify[Identify intent: Cancel Subscription]
+        Authenticate[Validate customer using mobile number and OTP]
+        Authenticated{Customer authenticated?}
+        AuthenticateAlternate[Validate using alternate mobile number and OTP]
+        AlternateAuthenticated{Customer authenticated?}
+        ThankYou[Show thank-you message and ask if further assistance is needed]
+        RequestWebForm[Request customer to fill and submit web form]
+    end
+
+    subgraph LiquidBarcodes[Liquid Barcodes]
+        ValidateProfile[Validate customer profile via API]
+        AccountActive{Account active?}
+        CaptureReason[Capture cancellation reason]
+        UpdateCancellation[Call API to update subscription cancellation]
+        CancelSubscription[Cancel customer subscription]
+    end
+
+    subgraph Salesforce
+        CreateTicket[Create Salesforce ticket via API]
+    end
+
+    Start --> Identify
+    Identify --> Authenticate
+    Authenticate --> Authenticated
+    Authenticated -- Yes --> ValidateProfile
+    Authenticated -- No --> AlternateNumber
+    AlternateNumber --> AuthenticateAlternate
+    AuthenticateAlternate --> AlternateAuthenticated
+    AlternateAuthenticated -- Yes --> ValidateProfile
+    AlternateAuthenticated -- No --> RequestWebForm
+    RequestWebForm --> WebForm
+    WebForm --> CreateTicket
+    CreateTicket --> End
+
+    ValidateProfile --> AccountActive
+    AccountActive -- Yes --> CaptureReason
+    AccountActive -- No --> RequestWebForm
+    CaptureReason --> Reason
+    Reason --> Confirm
+    Confirm -- Yes --> UpdateCancellation
+    UpdateCancellation --> CancelSubscription
+    CancelSubscription --> ThankYou
+    Confirm -- No --> ThankYou
+    ThankYou --> End
