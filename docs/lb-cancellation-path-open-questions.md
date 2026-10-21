@@ -1,5 +1,7 @@
 # Liquid Barcodes Agent API: Cancellation Path Questions
 
+> **Status (October 14, 2026):** Most questions in this original request have been answered. See [agent-api-cancellation-email-summary.md](./agent-api-cancellation-email-summary.md) for confirmed decisions and remaining open items, and [cancel-subscription-integration-plan.md](./cancel-subscription-integration-plan.md) for the current implementation plan. This document is retained as the historical question set.
+
 **Subject:** Agent API clarification and sandbox requirements for subscription cancellation
 
 Hi Liquid Barcodes team,
