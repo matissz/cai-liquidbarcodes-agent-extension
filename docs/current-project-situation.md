@@ -61,7 +61,7 @@ Remaining external dependencies are:
 - CK request-volume estimates before LB defines rate limits and the `429` contract.
 - Release availability of `GET /v1/audit-events`, which is still in testing.
 
-The readable decision record is [agent-api-cancellation-email-summary.md](./agent-api-cancellation-email-summary.md). The implementation and validation sequence is maintained in [cancel-subscription-integration-plan.md](./cancel-subscription-integration-plan.md). The original question set remains in [lb-cancellation-path-open-questions.md](./lb-cancellation-path-open-questions.md) as historical context.
+The readable decision record is [agent-api-cancellation-email-summary.md](./agent-api-cancellation-email-summary.md). The implementation and validation sequence is maintained in [cancel-subscription-integration-plan.md](./cancel-subscription-integration-plan.md).
 
 ## Planning Approach
 

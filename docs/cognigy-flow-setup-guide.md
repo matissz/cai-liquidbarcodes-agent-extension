@@ -4,6 +4,10 @@ This guide consolidates the implementation details and sandbox findings for vers
 
 > Never paste real API keys, signature salts, access tokens, SSO tokens, or OTP codes into documentation, Say nodes, or logs. The examples below use placeholders.
 
+### Node availability in version 1.3.1
+
+The installed extension currently exposes five operation nodes: **Start OTP**, **Verify OTP**, **Get User Profile**, **Select Cancellation Subscription**, and **Cancel Subscription**. The source repository also contains tested but unregistered implementations for Request/Exchange SSO Token, stores, machine status, receipts, subscription-member management, plate number, and coupon issuance. Sections describing those dormant nodes are retained as implementation reference only; they cannot be added to a Cognigy flow until they are registered in `src/module.ts` and released.
+
 ## 1. Important Findings
 
 1. The live sandbox returns response properties in **camelCase**, although older API examples use PascalCase.
@@ -278,6 +282,22 @@ Authenticate user
 
 **Destructive-operation warning:** Cancel Subscription acts on the subscription ID and affects the owner and all attached members. The current extension provides no undo or reactivation node. Normally cancellation is scheduled for the current period end; verify the resulting state with Get User Profile after the write. Never select the first candidate automatically when the outcome is `multipleCandidates`.
 
+A successful cancellation stores:
+
+```json
+{
+  "success": true,
+  "data": null,
+  "verification": {
+    "required": true,
+    "operation": "getUser",
+    "directive": "verifyStateBeforeRetry"
+  }
+}
+```
+
+A `200` response can represent a new cancellation or an already-inactive subscription. Timeout/network failures, `UnexpectedError` (`1009`), and `DependencyError` (`1008`) also require a fresh Get User Profile check before any retry. Do not retry `notOwner` (`91`) or `SubscriptionNotFound` (`90`).
+
 ## 7. Other Common Flows
 
 ### List stores and machine availability
@@ -424,9 +444,7 @@ For Verify OTP `1002`, use the same neutral user behavior for unknown numbers, w
 expired codes, exhausted attempts, and frozen numbers. A suitable prompt is: "That didn't
 work. Shall I send a new code?"
 
-The complete policy and rationale are in
-[Success and Error Branching](success-error-branching.md#shared-on-error-handler).
-For the exact designer layout and operation-specific If value references, see
+For the complete policy, designer layout, and operation-specific If value references, see
 [On Error Outcome Setup](on-error-if-node-setup.md).
 
 Older flow instances may not refresh generated children automatically. Delete and recreate
@@ -481,4 +499,4 @@ The following behavior was not established by the extension implementation or li
 7. API rate limits.
 8. Whether Issue Coupon has a separate operation for retrieving the generated coupon or wash code.
 
-For complete endpoint and signing details, see [Agent API Reference](agent-api-reference.md). For field-by-field response descriptions, see [Node Input & Output Reference](node-input-output-reference.md).
+For complete endpoint, response-field, and signing details, see [Agent API Reference](agent-api-reference.md).
