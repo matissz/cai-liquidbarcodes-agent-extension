@@ -1,7 +1,7 @@
 # Current Project Situation
 
 **Last updated:** October 21, 2026
-**Current extension version:** 1.2.4
+**Current extension version:** 1.3.0
 
 ## Overview
 
@@ -25,7 +25,7 @@ The extension currently includes a Cancel Subscription node that:
   deterministic no-retry results, and state verification before retrying uncertain writes.
 - Requires a fresh Get User Profile verification after every successful cancellation response.
 
-All existing source API nodes now use the common error envelope and clear stale shared error state after success. User types preserve owner/child roles plus owned and shared subscription collections. Dormant source nodes have not been newly exposed by the extension module.
+All existing source API nodes now use the common error envelope and clear stale shared error state after success. User types preserve owner/child roles plus owned and shared subscription collections. Get User Profile deterministically classifies matching cancellation subscriptions from a required configured plan-ID allowlist, preserves existing profile paths, and exposes `selected`, `multipleCandidates`, `alreadyInactive`, `notOwner`, or `noMatch`. It never chooses arbitrarily when multiple owner subscriptions match. Dormant source nodes have not been newly exposed by the extension module.
 
 The complete cancellation journey must cover more than the API call itself. It depends on correctly authenticating the customer, identifying the relevant subscription, determining whether the customer is authorized to cancel it, handling deterministic cancellation outcomes, and validating the result against suitable sandbox data.
 
@@ -57,7 +57,7 @@ Remaining external dependencies are:
 
 - LB confirmation that automated state-changing tests may run without prior approval.
 - Manual LB reset after successful cancellation and a predictable reset turnaround time.
-- A final car-wash `planId` allowlist for production subscription selection.
+- A final car-wash `planId` allowlist to configure the implemented production subscription selector.
 - CK request-volume estimates before LB defines rate limits and the `429` contract.
 - Release availability of `GET /v1/audit-events`, which is still in testing.
 
