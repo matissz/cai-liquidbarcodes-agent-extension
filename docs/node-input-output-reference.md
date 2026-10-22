@@ -296,7 +296,6 @@ consents, payment methods, plate number, and more.
 |---|---|---|---|
 | Connection | Yes | The Liquid Barcodes Agent API connection | — |
 | Access Token | Yes | The login token (filled in automatically) | `{{context.liquidBarcodesAgent.session.accessToken}}` |
-| Allowed Car-Wash Plan IDs | Yes | Non-empty JSON array supplied by LB/business configuration | `[42, 108]` |
 | Store Result In | Yes | Where to save the profile | `liquidBarcodesAgent.user` |
 
 ### Output (on success)
@@ -310,8 +309,7 @@ The full user profile is saved. The most useful fields:
 | `Name` / `Surname` | The user's name. |
 | `Emails` | List of email addresses. |
 | `Subscriptions` / `subscriptions` | Owned subscriptions returned by LB. |
-| `SharedSubscriptions` / `sharedSubscriptions` | Family-inherited subscriptions; these are never selected for cancellation. |
-| `cancellationSelection` | Deterministic cancellation selection metadata added by the extension. |
+| `SharedSubscriptions` / `sharedSubscriptions` | Family-inherited subscriptions returned by LB. |
 | `Consents` | Consent/agreement statuses. |
 | `PaymentMethods` | Saved payment methods. |
 | `PlateNumber` | The user's saved license plate (if any). |
@@ -320,11 +318,27 @@ Example of reading values afterwards:
 
 ```
 {{context.liquidBarcodesAgent.user.Name}}
-{{context.liquidBarcodesAgent.user.cancellationSelection.outcome}}
-{{context.liquidBarcodesAgent.user.cancellationSelection.selected.subscriptionId}}
+{{context.liquidBarcodesAgent.user.subscriptions}}
+{{context.liquidBarcodesAgent.user.sharedSubscriptions}}
 ```
 
-Selection outcomes:
+Get User is the authoritative independent read. It stores the provider response unchanged and does not perform cancellation selection.
+
+---
+
+## 6. Select Cancellation Subscription
+
+**What it does:** Applies the configured car-wash plan rule to a fresh Get User profile. This is a local decision node and sends no HTTP request.
+
+### Inputs
+
+| Field | Required? | What to put in | Example |
+|---|---|---|---|
+| User Profile | Yes | Complete fresh Get User result | `{{context.liquidBarcodesAgent.user}}` |
+| Allowed Car-Wash Plan IDs | Yes | Non-empty JSON array supplied by LB/business configuration | `[42, 108]` |
+| Store Result In | Yes | Where to save selection metadata | `liquidBarcodesAgent.cancellationSelection` |
+
+### Output
 
 | Outcome | Meaning |
 |---|---|
@@ -334,16 +348,11 @@ Selection outcomes:
 | `notOwner` | Matching subscriptions exist only in the shared/family collection. |
 | `noMatch` | No subscription matches the configured plan IDs. |
 
-`selected` and `candidates` contain the unchanged records returned by LB. The selector accepts camelCase and PascalCase provider fields. A missing role in the owned `subscriptions` collection is treated as owner, and a missing state is eligible. A matching record with an invalid subscription ID routes to **On Error** as `invalidInput`.
-
-**Limitations / notes**
-- Configure the production plan-ID allowlist supplied by LB/business; no plan IDs are hard-coded.
-- Only use `cancellationSelection.selected.subscriptionId` when the outcome is `selected`.
-- Do not choose the first item for `multipleCandidates`.
+Use `{{context.liquidBarcodesAgent.cancellationSelection.selected.subscriptionId}}` only for `selected`. `selected` and `candidates` preserve the unchanged records returned by Get User. Do not choose the first candidate automatically for `multipleCandidates`.
 
 ---
 
-## 6. Get Stores
+## 7. Get Stores
 
 **What it does:** Lists all stores, or looks up a single store when you provide a store ID.
 
@@ -388,7 +397,7 @@ Selection outcomes:
 
 ---
 
-## 7. Get Machine Status
+## 8. Get Machine Status
 
 **What it does:** Shows the status of machines (e.g. car wash machines) grouped by store.
 
@@ -435,7 +444,7 @@ Selection outcomes:
 
 ---
 
-## 8. Get Receipts
+## 9. Get Receipts
 
 **What it does:** Fetches the signed-in user's purchase receipts, optionally filtered by store
 and/or date.
@@ -480,7 +489,7 @@ and/or date.
 
 ---
 
-## 9. Get Subscription Users
+## 10. Get Subscription Users
 
 **What it does:** Lists the people (family members) attached to a **multi-user** subscription.
 
@@ -530,7 +539,7 @@ These nodes **change something** in the user's account. They all need a valid lo
 
 ---
 
-## 10. Cancel Subscription
+## 11. Cancel Subscription
 
 **What it does:** Cancels a subscription by its ID.
 
@@ -566,7 +575,7 @@ These nodes **change something** in the user's account. They all need a valid lo
 
 ---
 
-## 11. Add Subscription User
+## 12. Add Subscription User
 
 **What it does:** Adds a person (family member) to a multi-user subscription.
 
@@ -593,7 +602,7 @@ These nodes **change something** in the user's account. They all need a valid lo
 
 ---
 
-## 12. Remove Subscription User
+## 13. Remove Subscription User
 
 **What it does:** Removes a person (family member) from a multi-user subscription.
 
@@ -620,7 +629,7 @@ These nodes **change something** in the user's account. They all need a valid lo
 
 ---
 
-## 13. Set Plate Number
+## 14. Set Plate Number
 
 **What it does:** Updates the signed-in user's saved license plate number.
 
@@ -645,7 +654,7 @@ These nodes **change something** in the user's account. They all need a valid lo
 
 ---
 
-## 14. Issue Coupon
+## 15. Issue Coupon
 
 **What it does:** Issues a coupon (for example, a single car-wash code) to the signed-in user.
 

@@ -1,7 +1,7 @@
 # Current Project Situation
 
-**Last updated:** October 21, 2026
-**Current extension version:** 1.3.0
+**Last updated:** October 22, 2026
+**Current extension version:** 1.3.1
 
 ## Overview
 
@@ -25,7 +25,7 @@ The extension currently includes a Cancel Subscription node that:
   deterministic no-retry results, and state verification before retrying uncertain writes.
 - Requires a fresh Get User Profile verification after every successful cancellation response.
 
-All existing source API nodes now use the common error envelope and clear stale shared error state after success. User types preserve owner/child roles plus owned and shared subscription collections. Get User Profile deterministically classifies matching cancellation subscriptions from a required configured plan-ID allowlist, preserves existing profile paths, and exposes `selected`, `multipleCandidates`, `alreadyInactive`, `notOwner`, or `noMatch`. It never chooses arbitrarily when multiple owner subscriptions match. Dormant source nodes have not been newly exposed by the extension module.
+All existing source API nodes now use the common error envelope and clear stale shared error state after success. User types preserve owner/child roles plus owned and shared subscription collections. Get User Profile is the independent authoritative read and stores its response unchanged. The separate Select Cancellation Subscription node consumes that fresh profile, applies the configured plan-ID allowlist, and exposes `selected`, `multipleCandidates`, `alreadyInactive`, `notOwner`, or `noMatch`. It never chooses arbitrarily when multiple owner subscriptions match. Dormant source API nodes have not been newly exposed by the extension module.
 
 The complete cancellation journey must cover more than the API call itself. It depends on correctly authenticating the customer, identifying the relevant subscription, determining whether the customer is authorized to cancel it, handling deterministic cancellation outcomes, and validating the result against suitable sandbox data.
 
@@ -34,8 +34,8 @@ The complete cancellation journey must cover more than the API call itself. It d
 The repository is currently healthy at the code level:
 
 - The project builds successfully.
-- All 22 automated test suites pass.
-- All 259 automated tests pass.
+- All 24 automated test suites pass.
+- All 314 automated tests pass.
 - The working branch is synchronized with its remote branch.
 
 Automated tests confirm the extension's behavior against the previously understood contract. LB has now supplied reserved sandbox identities and SSO test tokens for the required cancellation scenarios, but successful end-to-end cancellation has not yet been recorded. The active test subscription also requires a manual LB reset after cancellation. Passing unit tests therefore does not yet represent final acceptance of the complete cancellation flow.

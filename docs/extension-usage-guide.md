@@ -1,12 +1,22 @@
 # Liquid Barcodes Agent Extension -- Usage Guide
 
-> **Version:** 1.3.0. Some API capabilities still require Liquid Barcodes confirmation before production use.
+> **Version:** 1.3.1. Some API capabilities still require Liquid Barcodes confirmation before production use.
 
-## Upgrading to 1.3.0
+## Version 1.3.1 upgrade notes
 
-Version 1.3.0 adds deterministic cancellation selection to **Get User Profile**. After installing the extension, reopen every existing Get User Profile node and set **Allowed Car-Wash Plan IDs** to the environment-specific JSON allowlist supplied by Liquid Barcodes/business, for example `[42, 108]`. The field is required; invalid configuration follows the node's **On Error** branch as `invalidInput` before any request is sent.
+Version `1.3.1` corrects the cancellation flow introduced in `1.3.0`. After installing the new extension package:
 
-Existing profile fields are preserved. The node adds `cancellationSelection`, which flows must inspect instead of selecting `Subscriptions[0]`:
+1. Open and save existing **Get User Profile** nodes. They no longer accept **Allowed Car-Wash Plan IDs** and now store only the authoritative Liquid Barcodes response.
+2. Add **Select Cancellation Subscription** immediately after each Get User Profile used by a cancellation flow.
+3. Configure the selector's environment-specific **Allowed Car-Wash Plan IDs** JSON array. Do not hard-code IDs from a user's response or reuse sandbox IDs in production.
+4. Update conditions to read `{{context.liquidBarcodesAgent.cancellationSelection.outcome}}`; selection metadata is no longer nested under the Get User result.
+5. Use only the selected current `subscriptionId`, obtain explicit customer confirmation, then run Get User Profile again after cancellation to verify state.
+
+## Cancellation selection correction
+
+**Get User Profile** is an independent authoritative read and requires no cancellation configuration. It stores the complete response unchanged. Run **Select Cancellation Subscription** afterward with the fresh profile and the environment-specific **Allowed Car-Wash Plan IDs** JSON allowlist supplied by Liquid Barcodes/business, for example `[42, 108]`.
+
+The selection node stores `liquidBarcodesAgent.cancellationSelection`, which flows must inspect instead of selecting `Subscriptions[0]`:
 
 | Outcome | Required flow action |
 |---|---|
@@ -22,7 +32,7 @@ Run Get User Profile immediately before cancellation so the ID and state are cur
 
 ## Overview
 
-This Cognigy extension integrates with the Liquid Barcodes Agent API and App API to provide loyalty program functionality within chat flows. It exposes 14 nodes covering authentication, data retrieval, and account actions (cancel subscription, manage family members, update plate number, issue a wash code).
+This Cognigy extension integrates with the Liquid Barcodes Agent API and App API to provide loyalty program functionality within chat flows. It exposes API nodes for authentication, data retrieval, and account actions plus a local cancellation-selection node.
 
 All nodes share a single connection (`Liquid Barcodes Agent API`) that holds credentials for both APIs.
 
@@ -331,7 +341,7 @@ All data nodes require an authenticated session. They read the access token from
 | | |
 |---|---|
 | **Node** | Get User Profile |
-| **Input** | `accessToken` (auto-wired); `allowedPlanIds` (required JSON array, for example `[42, 108]`) |
+| **Input** | `accessToken` (auto-wired) |
 | **API** | Agent API: `GET {baseUrl}/v1/user` |
 | **Output** | Stored in `context.liquidBarcodesAgent.user` |
 
@@ -347,18 +357,17 @@ Key fields in the response:
 | `Emails` | string[] | Email addresses |
 | `subscriptions` / `Subscriptions` | array | Owned subscriptions returned by Liquid Barcodes. |
 | `sharedSubscriptions` / `SharedSubscriptions` | array | Family-inherited subscriptions; never directly cancellable by the child. |
-| `cancellationSelection` | object | Deterministic selection outcome and matching candidate records. |
 | `Consents` | array | Consent statuses |
 
 Example usage in a flow after this node:
 
 ```
 {{context.liquidBarcodesAgent.user.Name}}
-{{context.liquidBarcodesAgent.user.cancellationSelection.outcome}}
-{{context.liquidBarcodesAgent.user.cancellationSelection.selected.subscriptionId}}
+{{context.liquidBarcodesAgent.user.subscriptions}}
+{{context.liquidBarcodesAgent.user.sharedSubscriptions}}
 ```
 
-Only read `selected.subscriptionId` after confirming that the outcome is `selected`.
+Pass this fresh profile to **Select Cancellation Subscription**. Only read `{{context.liquidBarcodesAgent.cancellationSelection.selected.subscriptionId}}` after confirming that its outcome is `selected`.
 
 ### Get Stores
 
@@ -463,7 +472,7 @@ with no body; on success the result stored in context is `{ success: true, data 
 | **API** | Agent API: `POST {baseUrl}/v1/subscriptions/cancel` |
 | **Output** | Stored in `context.liquidBarcodesAgent.cancelSubscription` |
 
-Cancels the selected owned subscription. Use the fresh ID from `cancellationSelection`, require explicit customer confirmation immediately before the request, and never pass a shared/member ID. Cancellation normally applies at period end. Run Get User Profile afterward to verify that the subscription is `Cancelled` or absent; also verify state before retrying an uncertain response.
+Cancels the selected owned subscription. Use the fresh ID from `liquidBarcodesAgent.cancellationSelection`, require explicit customer confirmation immediately before the request, and never pass a shared/member ID. Cancellation normally applies at period end. Run Get User Profile afterward to verify that the subscription is `Cancelled` or absent; also verify state before retrying an uncertain response.
 
 ### Get Subscription Users
 
@@ -618,13 +627,20 @@ A typical Cognigy flow using the SSO path to look up a user's subscription:
 
 5. [Exchange SSO Token: On Success] --> [Get User Profile]
    accessToken: (auto-filled from step 3)
-   allowedPlanIds: [42, 108] (replace with the configured environment allowlist)
-   --> stores user and cancellationSelection in context.liquidBarcodesAgent.user
+   --> stores the authoritative current profile in context.liquidBarcodesAgent.user
 
-6. [IF] {{context.liquidBarcodesAgent.user.cancellationSelection.outcome}} equals selected
-   --> Read the selected record, present it, and require explicit confirmation before cancellation.
+6. [Select Cancellation Subscription]
+   userProfile: {{context.liquidBarcodesAgent.user}}
+   allowedPlanIds: [42, 108] (replace with the configured environment allowlist)
+   --> stores selection in context.liquidBarcodesAgent.cancellationSelection
+
+7. [IF] {{context.liquidBarcodesAgent.cancellationSelection.outcome}} equals selected
+   --> Present the selected record and require explicit confirmation before cancellation.
    [ELSE]
    --> Handle multipleCandidates, alreadyInactive, notOwner, or noMatch as documented above.
+
+8. [Cancel Subscription] --> [Get User Profile]
+   --> Verify the selected subscription is Cancelled or absent.
 ```
 
 ## Example Flow: Find Nearest Open Store with Car Wash

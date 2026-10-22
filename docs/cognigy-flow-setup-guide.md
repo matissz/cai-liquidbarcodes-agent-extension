@@ -1,6 +1,6 @@
 # Cognigy Flow Setup Guide for Liquid Barcodes Agent
 
-This guide consolidates the implementation details and sandbox findings for version `1.3.0` of the Liquid Barcodes Agent extension. It is intended for Cognigy flow builders who need to know exactly which values each node requires, where those values come from, and which context paths to use afterward.
+This guide consolidates the implementation details and sandbox findings for version `1.3.1` of the Liquid Barcodes Agent extension. It is intended for Cognigy flow builders who need to know exactly which values each node requires, where those values come from, and which context paths to use afterward.
 
 > Never paste real API keys, signature salts, access tokens, SSO tokens, or OTP codes into documentation, Say nodes, or logs. The examples below use placeholders.
 
@@ -13,7 +13,7 @@ This guide consolidates the implementation details and sandbox findings for vers
 5. A `subscriptionId` identifies the whole subscription. A subscription member `id` identifies one member. They are not interchangeable.
 6. Adding or removing members requires the **subscription owner's access token** and a multi-user subscription.
 7. Cancel Subscription cancels the whole subscription and affects the owner and all members. The current extension has no reactivation operation.
-8. Version `1.3.0` retains safe diagnostics and camelCase compatibility, and adds a required **Allowed Car-Wash Plan IDs** field to Get User Profile. Reopen and configure every existing Get User Profile node after upgrading.
+8. Get User Profile is an independent authoritative read. Apply cancellation-specific plan filtering only afterward with Select Cancellation Subscription.
 
 ## 2. Connection Setup
 
@@ -38,7 +38,7 @@ Keep the default **Store Result In** values unless the flow has a specific reaso
 | Access token | `{{context.liquidBarcodesAgent.session.accessToken}}` | Exchange SSO Token or Verify OTP |
 | SSO token | `{{context.liquidBarcodesAgent.ssoToken.token}}` | Request SSO Token |
 | User ID | `{{context.liquidBarcodesAgent.user.userId}}` | Get User Profile in the live camelCase response |
-| Subscription ID | `{{context.liquidBarcodesAgent.user.subscriptions[0].subscriptionId}}` | A selected subscription from Get User Profile |
+| Cancellation subscription ID | `{{context.liquidBarcodesAgent.cancellationSelection.selected.subscriptionId}}` | A `selected` outcome from Select Cancellation Subscription |
 | Store ID | `{{context.liquidBarcodesAgent.stores.stores[0].id}}` | A selected store from Get Stores |
 | Subscription member ID | `{{context.liquidBarcodesAgent.subscriptionUsers.subscriptionUsers[0].id}}` or the matching member collection path visible in context | A selected member from Get Subscription Users |
 | OTP phone | `{{context.liquidBarcodesAgent.otpStart.phone}}` | Start OTP |
@@ -95,8 +95,10 @@ Successful Exchange SSO Token and Verify OTP calls both produce:
 | --- | --- | ---: | --- | --- |
 | Get User Profile | Connection | Yes | Liquid Barcodes Agent API connection | Cognigy connection |
 | Get User Profile | Access Token | Yes | `{{context.liquidBarcodesAgent.session.accessToken}}` | Keep default |
-| Get User Profile | Allowed Car-Wash Plan IDs | Yes | Production allowlist as JSON, for example `[42, 108]` | Obtain from LB/business configuration |
 | Get User Profile | Store Result In | Yes | `liquidBarcodesAgent.user` | Keep default |
+| Select Cancellation Subscription | User Profile | Yes | `{{context.liquidBarcodesAgent.user}}` | Fresh Get User result |
+| Select Cancellation Subscription | Allowed Car-Wash Plan IDs | Yes | Production allowlist as JSON, for example `[42, 108]` | Obtain from LB/business configuration |
+| Select Cancellation Subscription | Store Result In | Yes | `liquidBarcodesAgent.cancellationSelection` | Keep default |
 | Get Stores | Connection | Yes | Liquid Barcodes Agent API connection | Cognigy connection |
 | Get Stores | Access Token | Yes | `{{context.liquidBarcodesAgent.session.accessToken}}` | Keep default |
 | Get Stores | Store ID | No | Liquid internal store ID, or blank for all stores | ID from a previous Get Stores result or a trusted business-system mapping |
@@ -259,8 +261,11 @@ Removing one member does not cancel the whole subscription.
 
 ```text
 Authenticate user
-  -> Get User Profile (configure the approved car-wash plan IDs)
-  -> Branch on context.liquidBarcodesAgent.user.cancellationSelection.outcome
+  -> Get User Profile (independent authoritative read)
+  -> Select Cancellation Subscription
+     User Profile: {{context.liquidBarcodesAgent.user}}
+     Allowed Plan IDs: configured LB/business allowlist
+  -> Branch on context.liquidBarcodesAgent.cancellationSelection.outcome
      selected -> use cancellationSelection.selected.subscriptionId
      multipleCandidates -> show candidates and require an explicit customer choice
      alreadyInactive / notOwner / noMatch -> explain safely and stop
@@ -429,7 +434,7 @@ the API node after upgrading when On Success or On Error is missing.
 
 ## 9. Diagnostics and Safe Logging
 
-Version `1.3.0` logs sanitized lifecycle information for requests and responses. Logs can show operation, URL, status, configured-value presence/length, and API error metadata. They intentionally do not log raw API keys, salts, tokens, OTPs, signatures, phone numbers, or request/response bodies.
+Version `1.3.1` logs sanitized lifecycle information for requests and responses. Logs can show operation, URL, status, configured-value presence/length, and API error metadata. They intentionally do not log raw API keys, salts, tokens, OTPs, signatures, phone numbers, or request/response bodies.
 
 When troubleshooting:
 
@@ -441,12 +446,12 @@ When troubleshooting:
 6. Verify IDs were copied from the correct source object and were not confused with another ID type.
 7. Do not add secrets to temporary logging or Say nodes.
 
-A successful HTTP `200` plus data in context means the node succeeded even if an older log message reported a zero collection count. Version `1.3.0` includes correct collection counting for camelCase `stores` and `receipts` responses.
+A successful HTTP `200` plus data in context means the node succeeded even if an older log message reported a zero collection count. Version `1.3.1` includes correct collection counting for camelCase `stores` and `receipts` responses.
 
 ## 10. Production Checklist
 
-- [ ] Version `1.3.0` is installed in the target Cognigy environment.
-- [ ] Every Get User Profile node has the environment-specific **Allowed Car-Wash Plan IDs** JSON allowlist configured.
+- [ ] Version `1.3.1` is installed in the target Cognigy environment.
+- [ ] Every cancellation flow runs Get User Profile first, then configures the environment-specific **Allowed Car-Wash Plan IDs** on Select Cancellation Subscription.
 - [ ] All five connection values are supplied by Liquid Barcodes and belong to the same sandbox or production environment.
 - [ ] No credentials or user tokens are hard-coded in flow nodes.
 - [ ] The flow uses camelCase paths verified from the target environment's context.

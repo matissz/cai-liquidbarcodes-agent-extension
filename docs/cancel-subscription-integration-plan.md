@@ -54,7 +54,7 @@ Update the user response types and tests to support:
 
 ### 2. Define deterministic subscription selection — implemented locally
 
-Get User Profile now adds deterministic `cancellationSelection` metadata from the configured car-wash `planId` allowlist while preserving the provider profile fields. It:
+Get User Profile remains the independent authoritative read. A separate Select Cancellation Subscription node consumes its fresh response and adds deterministic `cancellationSelection` metadata from the configured car-wash `planId` allowlist. The combined flow:
 
 1. Reads fresh data from `GET /v1/user` for every cancellation attempt.
 2. Selects only the approved car-wash plans.

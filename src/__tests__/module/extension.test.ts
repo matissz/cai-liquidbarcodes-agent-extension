@@ -1,6 +1,7 @@
 import { authOtpStartNode } from '../../nodes/authOtpStart';
 import { authOtpVerifyNode } from '../../nodes/authOtpVerify';
 import { getUserNode } from '../../nodes/getUser';
+import { selectCancellationSubscriptionNode } from '../../nodes/selectCancellationSubscription';
 import { cancelSubscriptionNode } from '../../nodes/cancelSubscription';
 import {
   LIQUID_BARCODES_PARENT_TYPES,
@@ -15,16 +16,17 @@ const PARENT_NODES = [
   authOtpStartNode,
   authOtpVerifyNode,
   getUserNode,
+  selectCancellationSubscriptionNode,
   cancelSubscriptionNode,
 ];
 const RESULT_NODES = [liquidBarcodesOnSuccessNode, liquidBarcodesOnErrorNode];
 const ALL_NODES = [...PARENT_NODES, ...RESULT_NODES];
 
 describe('Extension structure', () => {
-  test('four API parents and two result nodes are defined', () => {
-    expect(PARENT_NODES).toHaveLength(4);
+  test('five operation parents and two result nodes are defined', () => {
+    expect(PARENT_NODES).toHaveLength(5);
     expect(RESULT_NODES).toHaveLength(2);
-    expect(ALL_NODES).toHaveLength(6);
+    expect(ALL_NODES).toHaveLength(7);
   });
 
   test('extension registers both result children with all API parents', () => {
@@ -33,7 +35,7 @@ describe('Extension structure', () => {
 
   test('all nodes have unique types', () => {
     const types = ALL_NODES.map(n => n.type);
-    expect(new Set(types).size).toBe(6);
+    expect(new Set(types).size).toBe(7);
   });
 
   test('all nodes have a defaultLabel', () => {
@@ -60,12 +62,13 @@ describe('Extension structure', () => {
     }
   });
 
-  test('all nodes reference the correct connection type', () => {
-    for (const node of PARENT_NODES) {
+  test('all API nodes reference the correct connection type', () => {
+    for (const node of PARENT_NODES.filter(node => node.type !== 'selectCancellationSubscription')) {
       const connField = node.fields!.find((f: any) => f.type === 'connection');
       expect(connField).toBeDefined();
       expect((connField as any).params.connectionType).toBe('liquid-barcodes-agent-api');
     }
+    expect(selectCancellationSubscriptionNode.fields!.some((field: any) => field.type === 'connection')).toBe(false);
   });
 
   test('all API parents create On Success and On Error children', () => {

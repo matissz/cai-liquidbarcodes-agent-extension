@@ -56,7 +56,7 @@ describe('Security: signatureSalt never leaks', () => {
   ];
 
   const DATA_NODES = [
-    { node: getUserNode, config: { connection, accessToken: 'at', allowedPlanIds: '[1]', contextKey: 'k' } },
+    { node: getUserNode, config: { connection, accessToken: 'at', contextKey: 'k' } },
     { node: getStoresNode, config: { connection, accessToken: 'at', storeId: '', contextKey: 'k' } },
     { node: getStoresMachinesStatusNode, config: { connection, accessToken: 'at', lastUpdateTime: '', contextKey: 'k' } },
     { node: getReceiptsNode, config: { connection, accessToken: 'at', storeId: '', dateFrom: '', contextKey: 'k' } },
@@ -119,7 +119,7 @@ describe('Security: signatureSalt never leaks', () => {
 describe('Security: apiKey only appears in X-Customer-Api-Key header', () => {
   const nodes = [
     { node: authSsoNode, config: { connection, ssoToken: 'tok1', contextKey: 'k' } },
-    { node: getUserNode, config: { connection, accessToken: 'at', allowedPlanIds: '[1]', contextKey: 'k' } },
+    { node: getUserNode, config: { connection, accessToken: 'at', contextKey: 'k' } },
   ];
 
   test.each(nodes.map(n => [n.node.type, n]))('%s: apiKey in header, not in context', async (_type, { node, config }) => {
@@ -352,7 +352,7 @@ describe('Security: header integrity', () => {
 
   test('data nodes send signature headers AND Authorization Bearer', async () => {
     const dataNodes = [
-      { node: getUserNode, config: { connection, accessToken: 'at', allowedPlanIds: '[1]', contextKey: 'k' } },
+      { node: getUserNode, config: { connection, accessToken: 'at', contextKey: 'k' } },
       { node: getStoresNode, config: { connection, accessToken: 'at', storeId: '', contextKey: 'k' } },
       { node: getStoresMachinesStatusNode, config: { connection, accessToken: 'at', lastUpdateTime: '', contextKey: 'k' } },
       { node: getReceiptsNode, config: { connection, accessToken: 'at', storeId: '', dateFrom: '', contextKey: 'k' } },

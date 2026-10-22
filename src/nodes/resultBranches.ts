@@ -4,6 +4,7 @@ export const LIQUID_BARCODES_PARENT_TYPES = [
   'authOtpStart',
   'authOtpVerify',
   'getUser',
+  'selectCancellationSubscription',
   'cancelSubscription',
 ] as const;
 

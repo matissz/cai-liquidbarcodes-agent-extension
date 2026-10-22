@@ -9,7 +9,8 @@ Cognigy.AI Extension for the Liquid Barcodes Agent API.
 | Exchange SSO Token | POST /v1/auth/sso | Swap an SSO token for an access token |
 | Start OTP | POST /v1/auth/otp/start | Send OTP code via SMS |
 | Verify OTP | POST /v1/auth/otp/verify | Verify OTP code and get access token |
-| Get User Profile | GET /v1/user | Retrieve the profile and deterministically classify cancellable car-wash subscriptions using configured plan IDs |
+| Get User Profile | GET /v1/user | Retrieve the authoritative current user profile and subscriptions |
+| Select Cancellation Subscription | Local only | Classify cancellable subscriptions from a fresh Get User profile using configured plan IDs |
 | Get Stores | GET /v1/stores | List stores or get a specific store |
 | Get Machine Status | GET /v1/stores/machines/status | Retrieve machine statuses |
 | Get Receipts | GET /v1/receipts | Retrieve user receipts |
@@ -40,17 +41,19 @@ npm run pack:cognigy
 
 Upload the generated `.tgz` file via **Manage > Extensions** in Cognigy.AI.
 
-## Version 1.3.0 upgrade notes
+## Version 1.3.1 upgrade
 
-After uploading version 1.3.0, reopen every existing **Get User Profile** node and configure **Allowed Car-Wash Plan IDs** with the environment-specific JSON allowlist supplied by Liquid Barcodes/business, for example `[42, 108]`. The field is required; an empty or malformed allowlist routes to **On Error** as `invalidInput` before an API request is made.
+Version `1.3.1` moves cancellation selection out of **Get User Profile**. Existing cancellation flows must add **Select Cancellation Subscription** after Get User, move the **Allowed Car-Wash Plan IDs** configuration to that node, and branch on `liquidBarcodesAgent.cancellationSelection.outcome`. Reopen and save affected nodes after importing the extension.
 
-Run **Get User Profile** immediately before cancellation and branch on `cancellationSelection.outcome`. Only send `cancellationSelection.selected.subscriptionId` to **Cancel Subscription** when the outcome is `selected`. Ask the customer to choose explicitly for `multipleCandidates`, and do not offer cancellation for `alreadyInactive`, `notOwner`, or `noMatch`.
+## Cancellation flow ordering
 
-Require explicit confirmation immediately before **Cancel Subscription**. Cancellation normally takes effect at period end. After every successful or uncertain cancellation response, run **Get User Profile** again and verify that the subscription is `Cancelled` or no longer present. Existing profile fields remain available unchanged; `cancellationSelection` is an added sibling field.
+**Get User Profile** is an independent authoritative read. It requires no cancellation configuration and stores the Liquid Barcodes response unchanged. Run it immediately before each cancellation attempt.
 
-### Cancellation subscription selection
+After Get User, run **Select Cancellation Subscription** with `{{context.liquidBarcodesAgent.user}}` and the environment-specific **Allowed Car-Wash Plan IDs** JSON array supplied by Liquid Barcodes/business, for example `[42, 108]`. The local node stores its result in `liquidBarcodesAgent.cancellationSelection` and makes no API request.
 
-**Get User Profile** requires **Allowed Car-Wash Plan IDs**, entered as a non-empty JSON array such as `[42, 108]`. Its stored profile remains backward-compatible and includes a sibling `cancellationSelection` object. Branch on `outcome`: `selected`, `multipleCandidates`, `alreadyInactive`, `notOwner`, or `noMatch`. Only use `selected.subscriptionId` for cancellation; `multipleCandidates` requires an explicit customer choice.
+Branch on `cancellationSelection.outcome`: `selected`, `multipleCandidates`, `alreadyInactive`, `notOwner`, or `noMatch`. Only pass `selected.subscriptionId` to **Cancel Subscription** when the outcome is `selected`. For `multipleCandidates`, present the candidates and require an explicit customer choice rather than selecting the first record.
+
+Require explicit confirmation immediately before **Cancel Subscription**. Cancellation normally takes effect at period end. After every successful or uncertain cancellation response, run **Get User Profile** again and verify that the selected subscription is `Cancelled` or no longer present.
 
 ## Test
 
