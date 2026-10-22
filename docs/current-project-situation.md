@@ -1,7 +1,7 @@
 # Current Project Situation
 
 **Last updated:** October 21, 2026
-**Current extension version:** 1.2.4
+**Current extension version:** 1.3.0
 
 ## Overview
 

@@ -1,6 +1,6 @@
 # Cognigy Flow Setup Guide for Liquid Barcodes Agent
 
-This guide consolidates the implementation details and sandbox findings verified while configuring and testing version `1.0.4` of the Liquid Barcodes Agent extension. It is intended for Cognigy flow builders who need to know exactly which values each node requires, where those values come from, and which context paths to use afterward.
+This guide consolidates the implementation details and sandbox findings for version `1.3.0` of the Liquid Barcodes Agent extension. It is intended for Cognigy flow builders who need to know exactly which values each node requires, where those values come from, and which context paths to use afterward.
 
 > Never paste real API keys, signature salts, access tokens, SSO tokens, or OTP codes into documentation, Say nodes, or logs. The examples below use placeholders.
 
@@ -13,7 +13,7 @@ This guide consolidates the implementation details and sandbox findings verified
 5. A `subscriptionId` identifies the whole subscription. A subscription member `id` identifies one member. They are not interchangeable.
 6. Adding or removing members requires the **subscription owner's access token** and a multi-user subscription.
 7. Cancel Subscription cancels the whole subscription and affects the owner and all members. The current extension has no reactivation operation.
-8. Version `1.0.4` adds safe request diagnostics and camelCase compatibility without changing node types or field keys, so existing node configurations should remain compatible when the extension is updated.
+8. Version `1.3.0` retains safe diagnostics and camelCase compatibility, and adds a required **Allowed Car-Wash Plan IDs** field to Get User Profile. Reopen and configure every existing Get User Profile node after upgrading.
 
 ## 2. Connection Setup
 
@@ -429,7 +429,7 @@ the API node after upgrading when On Success or On Error is missing.
 
 ## 9. Diagnostics and Safe Logging
 
-Version `1.0.4` logs sanitized lifecycle information for requests and responses. Logs can show operation, URL, status, configured-value presence/length, and API error metadata. They intentionally do not log raw API keys, salts, tokens, OTPs, signatures, phone numbers, or request/response bodies.
+Version `1.3.0` logs sanitized lifecycle information for requests and responses. Logs can show operation, URL, status, configured-value presence/length, and API error metadata. They intentionally do not log raw API keys, salts, tokens, OTPs, signatures, phone numbers, or request/response bodies.
 
 When troubleshooting:
 
@@ -441,11 +441,12 @@ When troubleshooting:
 6. Verify IDs were copied from the correct source object and were not confused with another ID type.
 7. Do not add secrets to temporary logging or Say nodes.
 
-A successful HTTP `200` plus data in context means the node succeeded even if an older log message reported a zero collection count. Version `1.0.4` corrects collection counting for camelCase `stores` and `receipts` responses.
+A successful HTTP `200` plus data in context means the node succeeded even if an older log message reported a zero collection count. Version `1.3.0` includes correct collection counting for camelCase `stores` and `receipts` responses.
 
 ## 10. Production Checklist
 
-- [ ] Version `1.0.4` or later is installed in the target Cognigy environment.
+- [ ] Version `1.3.0` is installed in the target Cognigy environment.
+- [ ] Every Get User Profile node has the environment-specific **Allowed Car-Wash Plan IDs** JSON allowlist configured.
 - [ ] All five connection values are supplied by Liquid Barcodes and belong to the same sandbox or production environment.
 - [ ] No credentials or user tokens are hard-coded in flow nodes.
 - [ ] The flow uses camelCase paths verified from the target environment's context.
@@ -458,7 +459,7 @@ A successful HTTP `200` plus data in context means the node succeeded even if an
 - [ ] Member capacity is checked before adding a member.
 - [ ] Member lists are refreshed after add/remove operations.
 - [ ] Subscription cancellation requires explicit user confirmation.
-- [ ] Cancellation timing and reactivation policy are confirmed with Liquid Barcodes.
+- [ ] The flow treats cancellation as end-of-period, displays available timing, and verifies the resulting state with a fresh Get User Profile call.
 - [ ] Coupon Schedule IDs are supplied and managed by Liquid Barcodes/business configuration.
 - [ ] Sensitive context values are not included in conversational output or custom logs.
 
@@ -470,7 +471,7 @@ The following behavior was not established by the extension implementation or li
 2. Whether an access-token refresh mechanism exists and whether token lifetime varies.
 3. Whether one phone number can map to multiple users and how phone-number changes affect identity.
 4. Whether another identity factor is available for sensitive operations.
-5. Exact cancellation timing and whether reactivation is available through another channel.
+5. Whether reactivation is available through another channel.
 6. Authoritative production response casing.
 7. API rate limits.
 8. Whether Issue Coupon has a separate operation for retrieving the generated coupon or wash code.
