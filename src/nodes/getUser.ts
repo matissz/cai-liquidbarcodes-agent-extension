@@ -3,6 +3,11 @@ import { makeAgentApiRequest } from '../utils/httpClient';
 import { extractApiError } from '../utils/extractApiError';
 import { clearApiError, storeApiError } from '../utils/errorHandling';
 import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
+import {
+  CancellationSelectionInputError,
+  parseAllowedPlanIds,
+  selectCancellationSubscription,
+} from '../utils/selectCancellationSubscription';
 import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
 import type { IUserResponse } from '../types/agentApi';
 
@@ -29,6 +34,13 @@ export const getUserNode = createNodeDescriptor({
       description: "Bearer token from SSO or OTP Verify",
     },
     {
+      key: "allowedPlanIds",
+      label: "Allowed Car-Wash Plan IDs",
+      type: "cognigyText",
+      params: { required: true },
+      description: "A JSON array of allowed car-wash plan IDs, for example [42, 108].",
+    },
+    {
       key: "contextKey",
       label: "Store Result In",
       type: "cognigyText",
@@ -45,6 +57,12 @@ export const getUserNode = createNodeDescriptor({
       fields: ["connection", "accessToken"],
     },
     {
+      key: "selection",
+      label: "Cancellation Selection",
+      defaultCollapsed: false,
+      fields: ["allowedPlanIds"],
+    },
+    {
       key: "output",
       label: "Output Settings",
       defaultCollapsed: true,
@@ -54,15 +72,17 @@ export const getUserNode = createNodeDescriptor({
 
   form: [
     { type: "section", key: "authentication" },
+    { type: "section", key: "selection" },
     { type: "section", key: "output" },
   ],
 
   function: async ({ cognigy, config, childConfigs }: INodeFunctionBaseParams) => {
     const { api } = cognigy;
-    const { connection, accessToken, contextKey } = config as any;
+    const { connection, accessToken, allowedPlanIds, contextKey } = config as any;
     let route: ResultRoute = 'error';
 
     try {
+      const parsedAllowedPlanIds = parseAllowedPlanIds(allowedPlanIds);
       const response = await makeAgentApiRequest<IUserResponse>({
         method: 'GET',
         baseUrl: connection.baseUrl,
@@ -74,12 +94,15 @@ export const getUserNode = createNodeDescriptor({
         log: (level, message) => api.log?.(level, message),
       });
 
-      api.addToContext?.(contextKey, response.data, 'simple');
+      const cancellationSelection = selectCancellationSubscription(response.data, parsedAllowedPlanIds);
+      api.addToContext?.(contextKey, { ...response.data, cancellationSelection }, 'simple');
       api.log?.('info', 'Get user profile succeeded');
       clearApiError(api);
       route = 'success';
     } catch (error: any) {
-      const apiError = extractApiError(error);
+      const apiError = error instanceof CancellationSelectionInputError
+        ? { message: error.message, code: 'InvalidInput', errorCode: 1001, status: 400 }
+        : extractApiError(error);
       api.log?.('error', `Get user profile failed: ${apiError.message}`);
       storeApiError(api, contextKey, 'getUser', 'protectedRead', apiError);
     }

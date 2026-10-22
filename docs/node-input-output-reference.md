@@ -296,6 +296,7 @@ consents, payment methods, plate number, and more.
 |---|---|---|---|
 | Connection | Yes | The Liquid Barcodes Agent API connection | — |
 | Access Token | Yes | The login token (filled in automatically) | `{{context.liquidBarcodesAgent.session.accessToken}}` |
+| Allowed Car-Wash Plan IDs | Yes | Non-empty JSON array supplied by LB/business configuration | `[42, 108]` |
 | Store Result In | Yes | Where to save the profile | `liquidBarcodesAgent.user` |
 
 ### Output (on success)
@@ -308,7 +309,9 @@ The full user profile is saved. The most useful fields:
 | `Msn` | Mobile number (country code + digits). |
 | `Name` / `Surname` | The user's name. |
 | `Emails` | List of email addresses. |
-| `Subscriptions` | List of subscriptions — each has `PlanName`, `SubscriptionId`, `SubscriptionState`, `IsMultiUserPlan`, renewal info, and balance. |
+| `Subscriptions` / `subscriptions` | Owned subscriptions returned by LB. |
+| `SharedSubscriptions` / `sharedSubscriptions` | Family-inherited subscriptions; these are never selected for cancellation. |
+| `cancellationSelection` | Deterministic cancellation selection metadata added by the extension. |
 | `Consents` | Consent/agreement statuses. |
 | `PaymentMethods` | Saved payment methods. |
 | `PlateNumber` | The user's saved license plate (if any). |
@@ -317,12 +320,26 @@ Example of reading values afterwards:
 
 ```
 {{context.liquidBarcodesAgent.user.Name}}
-{{context.liquidBarcodesAgent.user.Subscriptions[0].PlanName}}
+{{context.liquidBarcodesAgent.user.cancellationSelection.outcome}}
+{{context.liquidBarcodesAgent.user.cancellationSelection.selected.subscriptionId}}
 ```
 
+Selection outcomes:
+
+| Outcome | Meaning |
+|---|---|
+| `selected` | Exactly one matching owned, non-cancelled subscription is available. |
+| `multipleCandidates` | More than one eligible owner subscription matched; ask the customer to choose explicitly. |
+| `alreadyInactive` | Matching owned subscriptions exist, but they are cancelled. |
+| `notOwner` | Matching subscriptions exist only in the shared/family collection. |
+| `noMatch` | No subscription matches the configured plan IDs. |
+
+`selected` and `candidates` contain the unchanged records returned by LB. The selector accepts camelCase and PascalCase provider fields. A missing role in the owned `subscriptions` collection is treated as owner, and a missing state is eligible. A matching record with an invalid subscription ID routes to **On Error** as `invalidInput`.
+
 **Limitations / notes**
-- This is where you get the **User ID** and **Subscription IDs** needed by the subscription
-  action nodes below.
+- Configure the production plan-ID allowlist supplied by LB/business; no plan IDs are hard-coded.
+- Only use `cancellationSelection.selected.subscriptionId` when the outcome is `selected`.
+- Do not choose the first item for `multipleCandidates`.
 
 ---
 

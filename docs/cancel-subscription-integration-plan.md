@@ -52,20 +52,21 @@ Update the user response types and tests to support:
 
 **Completion evidence:** Representative owner and child `GET /v1/user` payloads pass parsing and node tests without losing relationship metadata.
 
-### 2. Define deterministic subscription selection
+### 2. Define deterministic subscription selection — implemented locally
 
-Implement or document flow logic that:
+Get User Profile now adds deterministic `cancellationSelection` metadata from the configured car-wash `planId` allowlist while preserving the provider profile fields. It:
 
 1. Reads fresh data from `GET /v1/user` for every cancellation attempt.
 2. Selects only the approved car-wash plans.
 3. Uses the current `subscriptionId`; it must not use a cached long-term ID.
 4. Separates owned subscriptions from `sharedSubscriptions`.
 5. Rejects child/shared subscriptions before presenting the destructive action.
-6. Handles zero, one, or multiple matching owned subscriptions explicitly rather than selecting an arbitrary item.
+6. Classifies zero, one, cancelled, child-only, and multiple owner matches explicitly.
+7. Returns all eligible records for `multipleCandidates` so the customer can choose; it never applies an automatic tie-break.
 
-**Dependency:** Obtain the production car-wash `planId` allowlist and deterministic tie-break behavior. Do not select by `planName` or arbitrary first match.
+**Remaining dependency:** Obtain and configure the production car-wash `planId` allowlist. Selection does not rely on `planName` and no IDs are hard-coded.
 
-**Completion evidence:** Tests cover no match, one owner match, child-only match, already-cancelled match, and multiple owner matches.
+**Completion evidence:** Automated tests cover configuration validation, both provider casing variants, no match, one owner match, child-only match, already-cancelled precedence, malformed matching IDs, and multiple owner matches.
 
 ### 3. Confirm the cancellation interaction
 
@@ -174,9 +175,9 @@ The milestone is complete when:
 
 ## Immediate Next Actions
 
-1. Update user-response typing and fixtures for `role` and `sharedSubscriptions`.
-2. Define subscription-selection behavior for zero, one, and multiple matches.
-3. Implement cancellation outcome normalization and post-action verification.
-4. Add targeted automated tests.
+1. Obtain and configure the production car-wash `planId` allowlist.
+2. Implement the Cognigy customer-choice branch for `multipleCandidates` and confirmation before cancellation.
+3. Implement post-action verification orchestration around the existing directives.
+4. Add flow-level automated tests.
 5. Request/record permission before running state-changing automation.
 6. Execute the controlled sandbox matrix and request manual reset after owner cancellation.

@@ -126,6 +126,19 @@ export interface ISubscription {
   AccumulatedBalance?: number;
 }
 
+export type CancellationSelectionOutcome =
+  | 'selected'
+  | 'multipleCandidates'
+  | 'alreadyInactive'
+  | 'notOwner'
+  | 'noMatch';
+
+export type CancellationSelection = {
+  outcome: CancellationSelectionOutcome;
+  candidates: ISubscription[];
+  selected?: ISubscription;
+};
+
 export interface IUserResponse {
   userId?: string;
   UserId?: string;

@@ -95,6 +95,7 @@ Successful Exchange SSO Token and Verify OTP calls both produce:
 | --- | --- | ---: | --- | --- |
 | Get User Profile | Connection | Yes | Liquid Barcodes Agent API connection | Cognigy connection |
 | Get User Profile | Access Token | Yes | `{{context.liquidBarcodesAgent.session.accessToken}}` | Keep default |
+| Get User Profile | Allowed Car-Wash Plan IDs | Yes | Production allowlist as JSON, for example `[42, 108]` | Obtain from LB/business configuration |
 | Get User Profile | Store Result In | Yes | `liquidBarcodesAgent.user` | Keep default |
 | Get Stores | Connection | Yes | Liquid Barcodes Agent API connection | Cognigy connection |
 | Get Stores | Access Token | Yes | `{{context.liquidBarcodesAgent.session.accessToken}}` | Keep default |
@@ -258,8 +259,11 @@ Removing one member does not cancel the whole subscription.
 
 ```text
 Authenticate user
-  -> Get User Profile
-  -> Select exact subscription
+  -> Get User Profile (configure the approved car-wash plan IDs)
+  -> Branch on context.liquidBarcodesAgent.user.cancellationSelection.outcome
+     selected -> use cancellationSelection.selected.subscriptionId
+     multipleCandidates -> show candidates and require an explicit customer choice
+     alreadyInactive / notOwner / noMatch -> explain safely and stop
   -> Show plan and impact
   -> Require explicit confirmation
   -> Cancel Subscription
@@ -267,7 +271,7 @@ Authenticate user
       On Success -> Get User Profile again
 ```
 
-**Destructive-operation warning:** Cancel Subscription acts on the subscription ID and affects the owner and all attached members. The current extension provides no undo or reactivation node. Cancellation timing, including whether it is immediate or effective at renewal, must be confirmed with Liquid Barcodes before production use.
+**Destructive-operation warning:** Cancel Subscription acts on the subscription ID and affects the owner and all attached members. The current extension provides no undo or reactivation node. Normally cancellation is scheduled for the current period end; verify the resulting state with Get User Profile after the write. Never select the first candidate automatically when the outcome is `multipleCandidates`.
 
 ## 7. Other Common Flows
 
