@@ -68,7 +68,7 @@ describe('Security: signatureSalt never leaks', () => {
     { node: addSubscriptionUserNode, config: { connection, accessToken: 'at', subscriptionId: '1', personalIdentifier: '123', contextKey: 'k' } },
     { node: removeSubscriptionUserNode, config: { connection, accessToken: 'at', subscriptionId: '1', userId: '2', contextKey: 'k' } },
     { node: setPlateNumberNode, config: { connection, accessToken: 'at', plateNumber: 'ABC123', contextKey: 'k' } },
-    { node: issueCouponNode, config: { connection, accessToken: 'at', scheduleId: '1', expirationDate: '', transactionId: '', contextKey: 'k' } },
+    { node: issueCouponNode, config: { connection, accessToken: 'at', scheduleId: '1', expirationDate: '', transactionId: 'txn-security', contextKey: 'k' } },
   ];
 
   const ALL = [...APP_API_NODES, ...AUTH_NODES, ...DATA_NODES, ...WRITE_NODES];
@@ -379,7 +379,7 @@ describe('Security: header integrity', () => {
       { node: addSubscriptionUserNode, config: { connection, accessToken: 'at', subscriptionId: '1', personalIdentifier: '123', contextKey: 'k' } },
       { node: removeSubscriptionUserNode, config: { connection, accessToken: 'at', subscriptionId: '1', userId: '2', contextKey: 'k' } },
       { node: setPlateNumberNode, config: { connection, accessToken: 'at', plateNumber: 'ABC123', contextKey: 'k' } },
-      { node: issueCouponNode, config: { connection, accessToken: 'at', scheduleId: '1', expirationDate: '', transactionId: '', contextKey: 'k' } },
+      { node: issueCouponNode, config: { connection, accessToken: 'at', scheduleId: '1', expirationDate: '', transactionId: 'txn-security', contextKey: 'k' } },
     ];
 
     for (const { node, config } of writeNodes) {

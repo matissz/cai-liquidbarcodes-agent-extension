@@ -4,7 +4,7 @@ import { extractApiError } from '../utils/extractApiError';
 import { clearApiError, storeApiError } from '../utils/errorHandling';
 import { routeToResultChild, ResultRoute } from '../utils/routeToResultChild';
 import { RESULT_CHILD_CONSTRAINTS, RESULT_CHILD_DEPENDENCIES } from './resultBranches';
-import type { IIssueCouponRequest, IWriteOperationResult } from '../types/agentApi';
+import type { IIssueCouponRequest, IIssueCouponResponse } from '../types/agentApi';
 
 export const issueCouponNode = createNodeDescriptor({
   type: "issueCoupon",
@@ -45,7 +45,8 @@ export const issueCouponNode = createNodeDescriptor({
       key: "transactionId",
       label: "Transaction ID",
       type: "cognigyText",
-      description: "Optional caller-supplied transaction reference.",
+      params: { required: true },
+      description: "Required unique transaction reference, up to 128 characters.",
     },
     {
       key: "contextKey",
@@ -89,19 +90,24 @@ export const issueCouponNode = createNodeDescriptor({
     let route: ResultRoute = 'error';
 
     try {
+      const normalizedTransactionId = String(transactionId ?? '').trim();
+      if (!normalizedTransactionId || normalizedTransactionId.length > 128) {
+        throw new Error('Transaction ID is required and must not exceed 128 characters.');
+      }
+
       const signatureFields: string[] = [String(scheduleId ?? '')];
-      const body: IIssueCouponRequest = { scheduleId: Number(scheduleId) };
+      const body: IIssueCouponRequest = {
+        scheduleId: Number(scheduleId),
+        transactionId: normalizedTransactionId,
+      };
 
       if (expirationDate) {
         signatureFields.push(expirationDate);
         body.expirationDate = expirationDate;
       }
-      if (transactionId) {
-        signatureFields.push(transactionId);
-        body.transactionId = transactionId;
-      }
+      signatureFields.push(normalizedTransactionId);
 
-      const response = await makeAgentApiRequest<IWriteOperationResult>({
+      const response = await makeAgentApiRequest<IIssueCouponResponse>({
         method: 'POST',
         baseUrl: connection.baseUrl,
         path: '/v1/coupons/issue',

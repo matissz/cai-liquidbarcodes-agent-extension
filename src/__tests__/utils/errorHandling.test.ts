@@ -12,6 +12,8 @@ describe('Liquid Barcodes error handling', () => {
     [{ error: { message: 'input', code: 'BOOTSTRAP_VALIDATION_FAILED' } }, 'invalidInput'],
     [{ error: { message: 'auth', errorCode: 1002 } }, 'authenticationFailed'],
     [{ error: { message: 'session', code: 'SessionInvalid' } }, 'sessionInvalid'],
+    [{ error: { message: 'rejected', errorCode: 1000 } }, 'requestRejected'],
+    [{ error: { message: 'duplicate', code: 'DuplicateIdempotencyKey' } }, 'duplicateIdempotencyKey'],
     [{ error: { message: 'bad request', status: 400 } }, 'badRequest'],
     [{ error: { message: 'missing', status: 404 } }, 'notFound'],
     [{ error: { message: 'conflict', status: 409 } }, 'conflict'],
@@ -32,11 +34,13 @@ describe('Liquid Barcodes error handling', () => {
   });
 
   test.each([
+    [1000, 'requestRejected'],
     [1001, 'invalidInput'],
     [1002, 'authenticationFailed'],
     [1003, 'invalidSignature'],
     [1004, 'sessionInvalid'],
     [1005, 'insufficientScope'],
+    [1007, 'duplicateIdempotencyKey'],
   ])('provider errorCode %s takes precedence over HTTP fallbacks', (errorCode, expected) => {
     expect(classifyApiError({
       error: { message: 'mixed', errorCode, status: 400 },
@@ -45,6 +49,8 @@ describe('Liquid Barcodes error handling', () => {
 
   test.each([
     [{ message: 'owner', errorCode: 91, status: 403 }, 'doNotRetry', undefined],
+    [{ message: 'rejected', errorCode: 1000, status: 409 }, 'doNotRetry', undefined],
+    [{ message: 'duplicate', errorCode: 1007, status: 409 }, 'doNotRetry', undefined],
     [{ message: 'session', errorCode: 1004, status: 401 }, 'reauthenticateOnce', 1],
     [{ message: 'dependency', errorCode: 1008, status: 502 }, 'verifyStateBeforeRetry', undefined],
     [{ message: 'timeout', transportFailure: 'timeout' as const }, 'verifyStateBeforeRetry', undefined],

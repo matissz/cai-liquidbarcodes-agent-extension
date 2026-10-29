@@ -1,7 +1,7 @@
 # Current Project Situation
 
 **Last updated:** October 22, 2026
-**Current extension version:** 1.3.1
+**Current extension version:** 1.4.0
 
 ## Overview
 
@@ -59,7 +59,7 @@ Remaining external dependencies are:
 - Manual LB reset after successful cancellation and a predictable reset turnaround time.
 - A final car-wash `planId` allowlist to configure the implemented production subscription selector.
 - CK request-volume estimates before LB defines rate limits and the `429` contract.
-- Release availability of `GET /v1/audit-events`, which is still in testing.
+- `GET /v1/audit-events` is now documented and exposed as **Get Audit Events** for signed lookup by user ID or phone.
 
 The readable decision record is [agent-api-cancellation-email-summary.md](./agent-api-cancellation-email-summary.md). The implementation and validation sequence is maintained in [cancel-subscription-integration-plan.md](./cancel-subscription-integration-plan.md).
 

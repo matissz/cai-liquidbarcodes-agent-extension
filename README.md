@@ -10,6 +10,7 @@ Cognigy.AI Extension for the Liquid Barcodes Agent API.
 | Start OTP | POST /v1/auth/otp/start | Send OTP code via SMS |
 | Verify OTP | POST /v1/auth/otp/verify | Verify OTP code and get access token |
 | Get User Profile | GET /v1/user | Retrieve the authoritative current user profile and subscriptions |
+| Get Audit Events | GET /v1/audit-events | Query customer audit events by user ID or phone without a customer session |
 | Select Cancellation Subscription | Local only | Classify cancellable subscriptions from a fresh Get User profile using configured plan IDs |
 | Get Stores | GET /v1/stores | List stores or get a specific store |
 | Get Machine Status | GET /v1/stores/machines/status | Retrieve machine statuses |
@@ -19,7 +20,7 @@ Cognigy.AI Extension for the Liquid Barcodes Agent API.
 | Add Subscription User | POST /v1/subscriptions/{id}/users | Add a family member to a multi-user subscription |
 | Remove Subscription User | DELETE /v1/subscriptions/{id}/users/{userId} | Remove a family member from a subscription |
 | Set Plate Number | PUT /v1/user/plate-number | Update the user's license plate number |
-| Issue Coupon | POST /v1/coupons/issue | Issue a coupon (e.g. a single wash code) to the user |
+| Issue Coupon | POST /v1/coupons/issue | Issue a coupon using a required unique transaction ID |
 
 ## Connection
 
@@ -40,6 +41,10 @@ npm run pack:cognigy
 ```
 
 Upload the generated `.tgz` file via **Manage > Extensions** in Cognigy.AI.
+
+## Version 1.4.0 upgrade
+
+Version `1.4.0` exposes **Exchange SSO Token** and **Issue Coupon**, adds **Get Audit Events**, and aligns coupon idempotency and error routing with the latest Agent API V1 guide. Coupon flows must provide a unique `transactionId`; audit queries must provide exactly one of user ID or phone.
 
 ## Version 1.3.1 upgrade
 

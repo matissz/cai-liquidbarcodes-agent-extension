@@ -273,7 +273,21 @@ export interface ISetPlateNumberRequest {
 export interface IIssueCouponRequest {
   scheduleId: number;
   expirationDate?: string;
-  transactionId?: string;
+  transactionId: string;
+}
+
+export interface IIssueCouponResponse {
+  contentId: number;
+  scheduleId: number;
+}
+
+export interface IAuditEvent {
+  occurredAt: string;
+  method: string;
+  path: string;
+  statusCode: number;
+  errorCode?: string;
+  userId?: string;
 }
 
 /** Endpoints that return `200 OK` with no documented response body. */

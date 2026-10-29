@@ -2,6 +2,7 @@ export const ERROR_HANDLING_CONTEXT_KEY = 'liquidBarcodesAgent.errorHandling.cur
 
 export type ErrorOutcome =
   | 'invalidInput' | 'authenticationFailed' | 'invalidSignature' | 'sessionInvalid'
+  | 'requestRejected' | 'duplicateIdempotencyKey'
   | 'insufficientScope' | 'notOwner' | 'subscriptionNotFound' | 'dependencyError'
   | 'unexpectedError' | 'rateLimited' | 'badRequest' | 'unauthorized' | 'forbidden'
   | 'notFound' | 'conflict' | 'timeout' | 'networkError' | 'technicalError';
@@ -69,8 +70,9 @@ function recoveryDirective(operation: string, outcome: ErrorOutcome, error: Norm
     outcome === 'timeout' || outcome === 'networkError' || outcome === 'dependencyError' ||
     outcome === 'unexpectedError' || error.status === 500 || error.status === 502
   )) return 'verifyStateBeforeRetry';
-  if (['invalidInput', 'invalidSignature', 'insufficientScope', 'notOwner', 'subscriptionNotFound',
-    'badRequest', 'forbidden', 'notFound', 'conflict'].includes(outcome)) return 'doNotRetry';
+  if (['invalidInput', 'invalidSignature', 'requestRejected', 'duplicateIdempotencyKey',
+    'insufficientScope', 'notOwner', 'subscriptionNotFound', 'badRequest', 'forbidden',
+    'notFound', 'conflict'].includes(outcome)) return 'doNotRetry';
   return 'none';
 }
 
@@ -80,6 +82,8 @@ export function classifyApiError(envelope: unknown): ErrorOutcome {
 
   const errorCode = error.errorCode == null ? undefined : String(error.errorCode);
   const code = error.code;
+  if (errorCode === '1000' || code === 'RequestRejected') return 'requestRejected';
+  if (errorCode === '1007' || code === 'DuplicateIdempotencyKey') return 'duplicateIdempotencyKey';
   if (errorCode === '91' || code === 'InvalidSubscriptionMemberId') return 'notOwner';
   if (errorCode === '90' || code === 'SubscriptionNotFound') return 'subscriptionNotFound';
   if (errorCode === '1008' || code === 'DependencyError') return 'dependencyError';

@@ -25,7 +25,7 @@ describe('issueCoupon node (POST /v1/coupons/issue)', () => {
       accessToken: 'tok',
       scheduleId: '101',
       expirationDate: '',
-      transactionId: '',
+      transactionId: 'txn-required',
       contextKey: 'lb.coupon',
     });
 
@@ -34,7 +34,7 @@ describe('issueCoupon node (POST /v1/coupons/issue)', () => {
     expect(mock.history.post.length).toBe(1);
   });
 
-  test('sends scheduleId as a number in the body (optionals omitted)', async () => {
+  test('sends scheduleId and required transactionId in the body', async () => {
     mock.onPost(new RegExp(`${TEST_CONNECTION.baseUrl}/v1/coupons/issue`)).reply(200, {});
 
     const { params } = createMockParams({
@@ -42,13 +42,13 @@ describe('issueCoupon node (POST /v1/coupons/issue)', () => {
       accessToken: 'tok',
       scheduleId: '101',
       expirationDate: '',
-      transactionId: '',
+      transactionId: 'txn-required',
       contextKey: 'lb.coupon',
     });
 
     await execute(params);
 
-    expect(JSON.parse(mock.history.post[0].data)).toEqual({ scheduleId: 101 });
+    expect(JSON.parse(mock.history.post[0].data)).toEqual({ scheduleId: 101, transactionId: 'txn-required' });
   });
 
   test('includes optional fields in body and signature when present', async () => {
@@ -79,7 +79,7 @@ describe('issueCoupon node (POST /v1/coupons/issue)', () => {
     expect(mock.history.post[0].headers!['X-Liquid-Signature']).toBe(expectedSig);
   });
 
-  test('signature = SHA256(timestamp + scheduleId + salt) with no optionals', async () => {
+  test('signature includes required transactionId when expiration date is omitted', async () => {
     const fixedTime = '2026-01-01T00:00:00.000Z';
     jest.spyOn(Date.prototype, 'toISOString').mockReturnValue(fixedTime);
 
@@ -90,13 +90,13 @@ describe('issueCoupon node (POST /v1/coupons/issue)', () => {
       accessToken: 'tok',
       scheduleId: '101',
       expirationDate: '',
-      transactionId: '',
+      transactionId: 'txn-required',
       contextKey: 'lb.coupon',
     });
 
     await execute(params);
 
-    const expectedInput = fixedTime + '101' + TEST_CONNECTION.signatureSalt;
+    const expectedInput = fixedTime + '101' + 'txn-required' + TEST_CONNECTION.signatureSalt;
     const expectedSig = crypto.createHash('sha256').update(expectedInput, 'utf8').digest('hex');
     expect(mock.history.post[0].headers!['X-Liquid-Signature']).toBe(expectedSig);
   });
@@ -109,7 +109,7 @@ describe('issueCoupon node (POST /v1/coupons/issue)', () => {
       accessToken: 'my-tok',
       scheduleId: '101',
       expirationDate: '',
-      transactionId: '',
+      transactionId: 'txn-required',
       contextKey: 'lb.coupon',
     });
 
@@ -118,9 +118,27 @@ describe('issueCoupon node (POST /v1/coupons/issue)', () => {
     expect(mock.history.post[0].headers!['Authorization']).toBe('Bearer my-tok');
   });
 
-  test('stores success result in context', async () => {
-    mock.onPost(new RegExp(`${TEST_CONNECTION.baseUrl}/v1/coupons/issue`)).reply(200, {});
+  test('stores the documented response in context', async () => {
+    mock.onPost(new RegExp(`${TEST_CONNECTION.baseUrl}/v1/coupons/issue`)).reply(200, {
+      contentId: 55,
+      scheduleId: 101,
+    });
 
+    const { params, contextStore } = createMockParams({
+      connection: TEST_CONNECTION,
+      accessToken: 'tok',
+      scheduleId: '101',
+      expirationDate: '',
+      transactionId: 'txn-required',
+      contextKey: 'lb.coupon',
+    });
+
+    await execute(params);
+
+    expect(contextStore['lb.coupon']).toEqual({ success: true, data: { contentId: 55, scheduleId: 101 } });
+  });
+
+  test('rejects a missing transaction ID before calling the API', async () => {
     const { params, contextStore } = createMockParams({
       connection: TEST_CONNECTION,
       accessToken: 'tok',
@@ -132,7 +150,8 @@ describe('issueCoupon node (POST /v1/coupons/issue)', () => {
 
     await execute(params);
 
-    expect(contextStore['lb.coupon'].success).toBe(true);
+    expect(mock.history.post).toHaveLength(0);
+    expect(contextStore['lb.coupon'].error.message).toContain('Transaction ID is required');
   });
 
   test('handles API error', async () => {
@@ -146,7 +165,7 @@ describe('issueCoupon node (POST /v1/coupons/issue)', () => {
       accessToken: 'tok',
       scheduleId: '0',
       expirationDate: '',
-      transactionId: '',
+      transactionId: 'txn-required',
       contextKey: 'lb.coupon',
     });
 

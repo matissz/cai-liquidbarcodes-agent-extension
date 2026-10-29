@@ -574,7 +574,7 @@ Update the signed-in user's license plate number. Requires `Authorization: Beare
 Issue a coupon (e.g. a single wash code) to the signed-in user. Requires `Authorization: Bearer`.
 Confirm `scheduleId` selection for a single car wash with Liquid Barcodes.
 
-**Signature construction:** `timestamp` + `scheduleId` + `expirationDate?` + `transactionId?` + `signatureSalt`
+**Signature construction:** `timestamp` + `scheduleId` + `expirationDate?` + `transactionId` + `signatureSalt`
 
 > Omit absent optional values from the concatenation (same rule as the data endpoints).
 
@@ -584,9 +584,9 @@ Confirm `scheduleId` selection for a single car wash with Liquid Barcodes.
 |---|---|---|---|
 | `scheduleId` | integer (int32) | Yes | The coupon schedule ID to issue (provided by Liquid Barcodes). |
 | `expirationDate` | string (date-time) | No | Expiration date/time for the issued coupon. |
-| `transactionId` | string | No | Caller-supplied transaction reference. |
+| `transactionId` | string | Yes | Client-generated unique transaction reference, up to 128 characters. |
 
-**Response 200:** `OK` (no documented body).
+**Response 200:** `{ "contentId": 123, "scheduleId": 456 }`.
 
 **Error responses:** [400](#error-response-400), [401](#error-response-401)
 

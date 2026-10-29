@@ -1,9 +1,12 @@
 import { createNodeDescriptor } from '@cognigy/extension-tools';
 
 export const LIQUID_BARCODES_PARENT_TYPES = [
+  'authSso',
   'authOtpStart',
   'authOtpVerify',
   'getUser',
+  'getAuditEvents',
+  'issueCoupon',
   'selectCancellationSubscription',
   'cancelSubscription',
 ] as const;

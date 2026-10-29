@@ -1,12 +1,12 @@
 # Cognigy Flow Setup Guide for Liquid Barcodes Agent
 
-This guide consolidates the implementation details and sandbox findings for version `1.3.1` of the Liquid Barcodes Agent extension. It is intended for Cognigy flow builders who need to know exactly which values each node requires, where those values come from, and which context paths to use afterward.
+This guide consolidates the implementation details and sandbox findings for version `1.4.0` of the Liquid Barcodes Agent extension. It is intended for Cognigy flow builders who need to know exactly which values each node requires, where those values come from, and which context paths to use afterward.
 
 > Never paste real API keys, signature salts, access tokens, SSO tokens, or OTP codes into documentation, Say nodes, or logs. The examples below use placeholders.
 
-### Node availability in version 1.3.1
+### Node availability in version 1.4.0
 
-The installed extension currently exposes five operation nodes: **Start OTP**, **Verify OTP**, **Get User Profile**, **Select Cancellation Subscription**, and **Cancel Subscription**. The source repository also contains tested but unregistered implementations for Request/Exchange SSO Token, stores, machine status, receipts, subscription-member management, plate number, and coupon issuance. Sections describing those dormant nodes are retained as implementation reference only; they cannot be added to a Cognigy flow until they are registered in `src/module.ts` and released.
+The installed extension exposes eight operation nodes: **Exchange SSO Token**, **Start OTP**, **Verify OTP**, **Get User Profile**, **Get Audit Events**, **Select Cancellation Subscription**, **Cancel Subscription**, and **Issue Coupon**. The source repository also contains tested but unregistered implementations for Request SSO Token, stores, machine status, receipts, subscription-member management, and plate number. Sections describing those dormant nodes are retained as implementation reference only; they cannot be added to a Cognigy flow until they are registered in `src/module.ts` and released.
 
 ## 1. Important Findings
 
@@ -100,6 +100,11 @@ Successful Exchange SSO Token and Verify OTP calls both produce:
 | Get User Profile | Connection | Yes | Liquid Barcodes Agent API connection | Cognigy connection |
 | Get User Profile | Access Token | Yes | `{{context.liquidBarcodesAgent.session.accessToken}}` | Keep default |
 | Get User Profile | Store Result In | Yes | `liquidBarcodesAgent.user` | Keep default |
+| Get Audit Events | Connection | Yes | Liquid Barcodes Agent API connection | Cognigy connection |
+| Get Audit Events | User ID | Conditional | Digits-only customer user ID | Supply exactly one of User ID or Phone |
+| Get Audit Events | Phone | Conditional | Digits-only phone including country code | Supply exactly one of User ID or Phone; 7-13 digits |
+| Get Audit Events | Limit | No | Number of newest events, from 1 to 500 | Defaults to `100` |
+| Get Audit Events | Store Result In | Yes | `liquidBarcodesAgent.auditEvents` | Keep default; no customer access token is required |
 | Select Cancellation Subscription | User Profile | Yes | `{{context.liquidBarcodesAgent.user}}` | Fresh Get User result |
 | Select Cancellation Subscription | Allowed Car-Wash Plan IDs | Yes | Production allowlist as JSON, for example `[42, 108]` | Obtain from LB/business configuration |
 | Select Cancellation Subscription | Store Result In | Yes | `liquidBarcodesAgent.cancellationSelection` | Keep default |
@@ -147,7 +152,7 @@ Successful Exchange SSO Token and Verify OTP calls both produce:
 | Issue Coupon | Access Token | Yes | Signed-in user's access token | `{{context.liquidBarcodesAgent.session.accessToken}}` |
 | Issue Coupon | Schedule ID | Yes | Coupon schedule configured by Liquid Barcodes | Obtain from Liquid Barcodes; do not substitute a store, coupon, or subscription ID |
 | Issue Coupon | Expiration Date | No | ISO 8601 expiration date/time | Example: `2026-12-31T23:59:59Z` |
-| Issue Coupon | Transaction ID | No | Caller-generated reference for tracking/idempotency according to business rules | Example: `order-2026-0001` |
+| Issue Coupon | Transaction ID | Yes | Unique caller-generated idempotency reference, up to 128 characters | Reuse the same value after a timeout; example: `order-2026-0001` |
 | Issue Coupon | Store Result In | Yes | `liquidBarcodesAgent.issueCoupon` | Keep default |
 
 Successful write operations store:
@@ -159,7 +164,7 @@ Successful write operations store:
 }
 ```
 
-The API may return an object instead of an empty body, in which case that body is placed in `data`. Connect the **On Success** child for normal processing and the **On Error** child for recovery. The stored `success`, `data`, and `error` values remain available for diagnostics and business decisions.
+Issue Coupon returns `contentId` and `scheduleId` in `data`; other writes may return an object instead of an empty body. Connect the **On Success** child for normal processing and the **On Error** child for recovery. The stored `success`, `data`, and `error` values remain available for diagnostics and business decisions.
 
 ## 5. Recommended Authentication Flows
 
@@ -185,6 +190,25 @@ Suggested values:
 | Verify OTP | Phone Number | `{{context.liquidBarcodesAgent.otpStart.phone}}` |
 | Verify OTP | OTP Code | Answer from the OTP Question node |
 | Get User Profile | Access Token | `{{context.liquidBarcodesAgent.session.accessToken}}` |
+
+#### OTP lifecycle and provider controls
+
+Liquid Barcodes applies the following OTP lifecycle and per-phone controls:
+
+- An OTP code is valid for **5 minutes**.
+- A phone number may request up to **3 codes per 5-minute period**.
+- A resend during that period delivers the **same code**, not a new code.
+- A phone number may make up to **5 incorrect verification attempts per hour**.
+- After the fifth incorrect attempt, the number is frozen for the remainder of that hour.
+- During a freeze, Start OTP requests are still accepted, but no SMS is sent.
+- Entering the correct code clears the freeze immediately.
+- Phone numbers must contain **7–13 digits**.
+- OTP codes must contain **4–8 digits**.
+- Request and verification counters are shared with the Liquid Barcodes mobile app. Attempts made in the app therefore reduce the attempts available to the bot.
+
+Start OTP deliberately returns `200` and does not reveal whether the phone number is registered, whether an SMS was sent, or whether the number is frozen. Verify OTP returns the same `401` / `AuthenticationFailed` / `1002` response for an unknown number, incorrect or expired code, exhausted attempts, or a frozen number. Only input-format validation returns `400` / `InvalidInput` / `1001`.
+
+Flows must use a neutral failure message, avoid claiming that an SMS was delivered, and bound all retry and resend paths. There is no explicit signal when a number becomes frozen.
 
 Use a stable Cognigy contact identity if the chat is embedded in an iframe. Do not rely on third-party iframe cookies for durable user mapping. Store the Liquid Barcodes user ID in the Cognigy contact profile, a parent application, or a backend/CRM appropriate to the solution.
 
@@ -468,7 +492,7 @@ A successful HTTP `200` plus data in context means the node succeeded even if an
 
 ## 10. Production Checklist
 
-- [ ] Version `1.3.1` is installed in the target Cognigy environment.
+- [ ] Version `1.4.0` is installed in the target Cognigy environment.
 - [ ] Every cancellation flow runs Get User Profile first, then configures the environment-specific **Allowed Car-Wash Plan IDs** on Select Cancellation Subscription.
 - [ ] All five connection values are supplied by Liquid Barcodes and belong to the same sandbox or production environment.
 - [ ] No credentials or user tokens are hard-coded in flow nodes.

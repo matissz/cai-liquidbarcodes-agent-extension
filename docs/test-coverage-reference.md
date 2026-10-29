@@ -35,10 +35,10 @@ npx jest --runInBand src/__tests__/auth/authOtpVerify.test.ts
 
 | Metric | Result |
 |---|---|
-| Statements | 100% (253/253) |
-| Lines | 100% (253/253) |
-| Functions | 100% (17/17) |
-| Branches | 73.91% (51/69) |
+| Statements | 99.66% (597/599) |
+| Lines | 100% (569/569) |
+| Functions | 100% (49/49) |
+| Branches | 84.61% (275/325) |
 
 Enforced minimums live in [jest.config.js](../jest.config.js) (`coverageThreshold`).
 The remaining branch gaps are defensive `?? ''` / `?? null` fallbacks — see
@@ -63,6 +63,7 @@ The remaining branch gaps are defensive `?? ''` / `?? null` fallbacks — see
   - [authOtpVerify.test.ts](#authotpverifytestts)
 - [Data-read node suites](#data-read-node-suites)
   - [getUser.test.ts](#getusertestts)
+  - [getAuditEvents.test.ts](#getauditseventstestts)
   - [getStores.test.ts](#getstorestestts)
   - [getStoresMachinesStatus.test.ts](#getstoresmachinesstatustestts)
   - [getReceipts.test.ts](#getreceiptstestts)
@@ -201,14 +202,14 @@ handling.
 
 ### extension.test.ts
 
-- **Target:** All 14 node definitions + [src/connections/agentApiConnection.ts](../src/connections/agentApiConnection.ts)
-- **Suite:** `Extension structure` · **10 tests**
+- **Target:** Eight operation parents, two result children, and [src/connections/agentApiConnection.ts](../src/connections/agentApiConnection.ts)
+- **Suite:** `Extension structure` · **12 tests**
 - **How:** Imports every node object and the connection, then asserts on their static
   metadata (no HTTP, no execution). Guards against mis-wired node/connection config.
 
 | # | Test | What it verifies |
 |---|---|---|
-| 1 | all 14 nodes are defined | The node list has exactly 14 entries. |
+| 1 | eight operation parents and two result nodes are defined | The exposed node list has exactly 10 entries. |
 | 2 | all nodes have unique types | No duplicate `type` identifiers. |
 | 3 | all nodes have a defaultLabel | Every node has a display label. |
 | 4 | all nodes have a function | Every node exposes an executable `function`. |
@@ -307,6 +308,11 @@ handling.
 | 3 | sends Authorization Bearer header | `Authorization: Bearer <token>`. |
 | 4 | stores full user model in context | `UserId`/`Msn` from the response persisted. |
 | 5-6 | preserves protected-session errors | `SessionInvalid` / `1004` and `InsufficientScope` / `1005` remain machine-readable. |
+
+### getAuditEvents.test.ts
+
+- **Target:** [src/nodes/getAuditEvents.ts](../src/nodes/getAuditEvents.ts) — signed, sessionless GET `/v1/audit-events`.
+- **Coverage:** user-ID and phone queries, default/explicit limits, signature field order, absence of Authorization, response storage, local validation, and API errors.
 
 ### getStores.test.ts
 
@@ -428,18 +434,18 @@ handling.
 
 ### issueCoupon.test.ts
 
-- **Target:** [src/nodes/issueCoupon.ts](../src/nodes/issueCoupon.ts) — POST `/v1/coupons/issue` (optional `expirationDate`, `transactionId`)
-- **Suite:** `issueCoupon node (...)` · **7 tests**
+- **Target:** [src/nodes/issueCoupon.ts](../src/nodes/issueCoupon.ts) — POST `/v1/coupons/issue` (optional `expirationDate`, required `transactionId`)
+- **Suite:** `issueCoupon node (...)` · **8 tests**
 
 | # | Test | What / how |
 |---|---|---|
 | 1 | calls POST /v1/coupons/issue | One POST issued. |
-| 2 | sends scheduleId as a number in the body (optionals omitted) | Body `{ scheduleId: 101 }` only. |
-| 3 | includes optional fields in body and signature when present | Body + signature include `expirationDate` + `transactionId`. |
-| 4 | signature = SHA256(timestamp + scheduleId + salt) with no optionals | Only `scheduleId` signed when optionals empty. |
+| 2 | sends scheduleId and required transactionId in the body | Body includes numeric `scheduleId` and unique transaction reference. |
+| 3 | includes optional fields in body and signature when present | Body + signature include `expirationDate` before `transactionId`. |
+| 4 | signature includes required transactionId when expiration date is omitted | Required ID remains part of the signature. |
 | 5 | sends Authorization Bearer header | Bearer present. |
-| 6 | stores success result in context | `{ success: true }`. |
-| 7 | handles API error | 400 → `error` stored. |
+| 6 | stores documented response in context | `contentId` and `scheduleId` are preserved. |
+| 7 | rejects a missing transaction ID | No HTTP call; validation error stored. |`r`n| 8 | handles API error | 400 → `error` stored. |
 
 ---
 

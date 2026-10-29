@@ -39,11 +39,14 @@ HTTP status alone is not sufficiently granular: `1002`, `1003`, and `1004` all u
 
 | `errorCode` | Provider `code` | HTTP | Stored `outcome` | Flow handling |
 | ---: | --- | ---: | --- | --- |
+| `1000` | `RequestRejected` | 409 | `requestRejected` | Do not retry unchanged. Correct the current state or request conditions first. |
 | `1001` | `InvalidInput` | 400 | `invalidInput` | Correct the input. Do not replay a write automatically. |
-| `1002` | `AuthenticationFailed` | 401 | `authenticationFailed` | Reauthenticate once. If that also fails, stop and use the configuration/support path. |
+| `1002` | `AuthenticationFailed` | 401 | `authenticationFailed` | On sign-in, do not retry the same credentials. On an authenticated endpoint, reauthenticate once and retry once; then stop. |
 | `1003` | `InvalidSignature` | 401 | `invalidSignature` | Do not retry. Check API key, signature configuration, timestamp parsing, and clock drift (allowed window is +/-10 minutes). |
 | `1004` | `SessionInvalid` | 401 | `sessionInvalid` | Recover the lost session. Replay only when the original operation is safe. |
 | `1005` | `InsufficientScope` | 403 | `insufficientScope` | Do not repeat the unchanged request. Correct permissions or endpoint scope. |
+| `1007` | `DuplicateIdempotencyKey` | 409 | `duplicateIdempotencyKey` | Do not retry with the same coupon `transactionId`; no second coupon was issued by the duplicate request. |
+| `89` | `InvalidSubscriptionId` | 400 | `badRequest` | Do not retry; correct the subscription ID. |
 | `90` | `SubscriptionNotFound` | 404 | `subscriptionNotFound` | Do not retry cancellation; refresh user state. |
 | `91` | `InvalidSubscriptionMemberId` | 403 | `notOwner` | Only the owner may cancel; do not retry. |
 | `1008` | `DependencyError` | 502 | `dependencyError` | For cancellation, refresh user state before any retry. |
@@ -57,8 +60,8 @@ The extension also stores explicit fallback outcomes when no recognized LB code 
 | `unauthorized` | HTTP 401 without recognized LB code |
 | `forbidden` | HTTP 403 without recognized LB code |
 | `notFound` | HTTP 404 |
-| `conflict` | HTTP 409 |
-| `rateLimited` | HTTP 429; preserve generic `retryAfter` metadata when supplied |
+| `conflict` | HTTP 409 without recognized LB code; documented `1000` and `1007` conflicts use their specific outcomes above |
+| `rateLimited` | Forward-compatible HTTP 429 handling; the current V1 guide says no rate limits or 429 responses are configured |
 | `timeout` | Request timed out before a response was received |
 | `networkError` | No HTTP response was received |
 | `technicalError` | Server, malformed, missing, or unclassified failure |
@@ -100,10 +103,13 @@ The enabled nodes set these operation values automatically:
 
 | Node | `operation` | `operationClass` |
 | --- | --- | --- |
+| Exchange SSO Token | `authenticateSso` | `authentication` |
 | Start OTP | `startOtp` | `authentication` |
 | Verify OTP | `verifyOtp` | `otpVerify` |
 | Get User Profile | `getUser` | `protectedRead` |
+| Get Audit Events | `getAuditEvents` | `protectedRead` |
 | Cancel Subscription | `cancelSubscription` | `protectedWrite` |
+| Issue Coupon | `issueCoupon` | `protectedWrite` |
 
 Use `operationClass` only when recovery differs by operation. For `reauthenticateOnce`, authenticate and replay at most once; if either step fails, stop without a loop. For cancellation success, timeout/network, `500/1009`, or `502/1008`, run Get User Profile and inspect fresh state before deciding whether a retry is safe. Never automatically replay Cancel Subscription before that verification because the write may have completed even if its response was not received.
 
