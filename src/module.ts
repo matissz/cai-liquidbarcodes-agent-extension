@@ -8,6 +8,8 @@ import { authOtpVerifyNode } from "./nodes/authOtpVerify";
 import { getUserNode } from "./nodes/getUser";
 import { getAuditEventsNode } from "./nodes/getAuditEvents";
 import { issueCouponNode } from "./nodes/issueCoupon";
+import { getDeviceLimitNode } from "./nodes/getDeviceLimit";
+import { clearUserDevicesNode } from "./nodes/clearUserDevices";
 import { selectCancellationSubscriptionNode } from "./nodes/selectCancellationSubscription";
 import { cancelSubscriptionNode } from "./nodes/cancelSubscription";
 import {
@@ -25,6 +27,8 @@ export default createExtension({
     selectCancellationSubscriptionNode,
     cancelSubscriptionNode,
     issueCouponNode,
+    getDeviceLimitNode,
+    clearUserDevicesNode,
     liquidBarcodesOnSuccessNode,
     liquidBarcodesOnErrorNode,
   ],

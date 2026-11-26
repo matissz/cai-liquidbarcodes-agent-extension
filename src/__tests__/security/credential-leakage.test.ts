@@ -14,6 +14,8 @@ import { addSubscriptionUserNode } from '../../nodes/addSubscriptionUser';
 import { removeSubscriptionUserNode } from '../../nodes/removeSubscriptionUser';
 import { setPlateNumberNode } from '../../nodes/setPlateNumber';
 import { issueCouponNode } from '../../nodes/issueCoupon';
+import { getDeviceLimitNode } from '../../nodes/getDeviceLimit';
+import { clearUserDevicesNode } from '../../nodes/clearUserDevices';
 import { createMockParams, getNodeFunction } from '../helpers';
 
 let mock: MockAdapter;
@@ -60,6 +62,7 @@ describe('Security: signatureSalt never leaks', () => {
     { node: getStoresNode, config: { connection, accessToken: 'at', storeId: '', contextKey: 'k' } },
     { node: getStoresMachinesStatusNode, config: { connection, accessToken: 'at', lastUpdateTime: '', contextKey: 'k' } },
     { node: getReceiptsNode, config: { connection, accessToken: 'at', storeId: '', dateFrom: '', contextKey: 'k' } },
+    { node: getDeviceLimitNode, config: { connection, accessToken: 'at', contextKey: 'k' } },
   ];
 
   const WRITE_NODES = [
@@ -69,6 +72,7 @@ describe('Security: signatureSalt never leaks', () => {
     { node: removeSubscriptionUserNode, config: { connection, accessToken: 'at', subscriptionId: '1', userId: '2', contextKey: 'k' } },
     { node: setPlateNumberNode, config: { connection, accessToken: 'at', plateNumber: 'ABC123', contextKey: 'k' } },
     { node: issueCouponNode, config: { connection, accessToken: 'at', scheduleId: '1', expirationDate: '', transactionId: 'txn-security', contextKey: 'k' } },
+    { node: clearUserDevicesNode, config: { connection, accessToken: 'at', transactionId: 'txn-device-security', contextKey: 'k' } },
   ];
 
   const ALL = [...APP_API_NODES, ...AUTH_NODES, ...DATA_NODES, ...WRITE_NODES];
@@ -356,6 +360,7 @@ describe('Security: header integrity', () => {
       { node: getStoresNode, config: { connection, accessToken: 'at', storeId: '', contextKey: 'k' } },
       { node: getStoresMachinesStatusNode, config: { connection, accessToken: 'at', lastUpdateTime: '', contextKey: 'k' } },
       { node: getReceiptsNode, config: { connection, accessToken: 'at', storeId: '', dateFrom: '', contextKey: 'k' } },
+      { node: getDeviceLimitNode, config: { connection, accessToken: 'at', contextKey: 'k' } },
     ];
 
     for (const { node, config } of dataNodes) {
@@ -380,6 +385,7 @@ describe('Security: header integrity', () => {
       { node: removeSubscriptionUserNode, config: { connection, accessToken: 'at', subscriptionId: '1', userId: '2', contextKey: 'k' } },
       { node: setPlateNumberNode, config: { connection, accessToken: 'at', plateNumber: 'ABC123', contextKey: 'k' } },
       { node: issueCouponNode, config: { connection, accessToken: 'at', scheduleId: '1', expirationDate: '', transactionId: 'txn-security', contextKey: 'k' } },
+      { node: clearUserDevicesNode, config: { connection, accessToken: 'at', transactionId: 'txn-device-security', contextKey: 'k' } },
     ];
 
     for (const { node, config } of writeNodes) {

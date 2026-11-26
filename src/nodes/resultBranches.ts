@@ -7,6 +7,8 @@ export const LIQUID_BARCODES_PARENT_TYPES = [
   'getUser',
   'getAuditEvents',
   'issueCoupon',
+  'getDeviceLimit',
+  'clearUserDevices',
   'selectCancellationSubscription',
   'cancelSubscription',
 ] as const;

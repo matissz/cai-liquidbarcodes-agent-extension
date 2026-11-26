@@ -4,6 +4,8 @@ import { authOtpVerifyNode } from '../../nodes/authOtpVerify';
 import { getUserNode } from '../../nodes/getUser';
 import { getAuditEventsNode } from '../../nodes/getAuditEvents';
 import { issueCouponNode } from '../../nodes/issueCoupon';
+import { getDeviceLimitNode } from '../../nodes/getDeviceLimit';
+import { clearUserDevicesNode } from '../../nodes/clearUserDevices';
 import { selectCancellationSubscriptionNode } from '../../nodes/selectCancellationSubscription';
 import { cancelSubscriptionNode } from '../../nodes/cancelSubscription';
 import {
@@ -24,15 +26,17 @@ const PARENT_NODES = [
   selectCancellationSubscriptionNode,
   cancelSubscriptionNode,
   issueCouponNode,
+  getDeviceLimitNode,
+  clearUserDevicesNode,
 ];
 const RESULT_NODES = [liquidBarcodesOnSuccessNode, liquidBarcodesOnErrorNode];
 const ALL_NODES = [...PARENT_NODES, ...RESULT_NODES];
 
 describe('Extension structure', () => {
-  test('eight operation parents and two result nodes are defined', () => {
-    expect(PARENT_NODES).toHaveLength(8);
+  test('ten operation parents and two result nodes are defined', () => {
+    expect(PARENT_NODES).toHaveLength(10);
     expect(RESULT_NODES).toHaveLength(2);
-    expect(ALL_NODES).toHaveLength(10);
+    expect(ALL_NODES).toHaveLength(12);
   });
 
   test('extension registers both result children with all API parents', () => {
@@ -41,7 +45,7 @@ describe('Extension structure', () => {
 
   test('all nodes have unique types', () => {
     const types = ALL_NODES.map(n => n.type);
-    expect(new Set(types).size).toBe(10);
+    expect(new Set(types).size).toBe(12);
   });
 
   test('all nodes have a defaultLabel', () => {
