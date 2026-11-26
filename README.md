@@ -21,6 +21,8 @@ Cognigy.AI Extension for the Liquid Barcodes Agent API.
 | Remove Subscription User | DELETE /v1/subscriptions/{id}/users/{userId} | Remove a family member from a subscription |
 | Set Plate Number | PUT /v1/user/plate-number | Update the user's license plate number |
 | Issue Coupon | POST /v1/coupons/issue | Issue a coupon using a required unique transaction ID |
+| Get Device Limit | GET /v1/user/devices/limit | Check whether the user has reached the app-device limit |
+| Clear User Devices | POST /v1/user/devices/clear | Clear the user's app devices using a required unique transaction ID |
 
 ## Connection
 
@@ -59,6 +61,16 @@ After Get User, run **Select Cancellation Subscription** with `{{context.liquidB
 Branch on `cancellationSelection.outcome`: `selected`, `multipleCandidates`, `alreadyInactive`, `notOwner`, or `noMatch`. Only pass `selected.subscriptionId` to **Cancel Subscription** when the outcome is `selected`. For `multipleCandidates`, present the candidates and require an explicit customer choice rather than selecting the first record.
 
 Require explicit confirmation immediately before **Cancel Subscription**. Cancellation normally takes effect at period end. After every successful or uncertain cancellation response, run **Get User Profile** again and verify that the selected subscription is `Cancelled` or no longer present.
+
+## Too many devices flow
+
+The Agent API integration must include the `user-devices:read` permission for **Get Device Limit** and `user-devices:write` for **Clear User Devices**.
+
+**Get Device Limit** stores its result in `liquidBarcodesAgent.deviceLimit` by default. A successful response has the shape `{ success: true, data: { limitReached: boolean } }`. Both `true` and `false` use **On Success**; inspect `data.limitReached` in the flow to decide whether clearing is needed.
+
+**Clear User Devices** stores its result in `liquidBarcodesAgent.clearUserDevices` by default. Supply a unique transaction ID of at most 128 characters for each intended clear operation. Reuse that ID only when retrying the same uncertain request. A successful result is `Cleared` or `NothingToClear` inside the standard success envelope.
+
+Clear rejections use **On Error**. Inspect `liquidBarcodesAgent.errorHandling.current` for `DeviceClearLimitReached` (`140`), `DuplicateIdempotencyKey` (`1007`), `RequestRejected` (`1000`), authentication recovery, and diagnostic `traceId` details. Do not expose provider error details directly to the customer.
 
 ## Test
 

@@ -281,6 +281,18 @@ export interface IIssueCouponResponse {
   scheduleId: number;
 }
 
+// ── App devices ──
+
+export interface IDeviceLimitResponse {
+  limitReached: boolean;
+}
+
+export interface IClearUserDevicesRequest {
+  transactionId: string;
+}
+
+export type ClearUserDevicesResult = 'Cleared' | 'NothingToClear';
+
 export interface IAuditEvent {
   occurredAt: string;
   method: string;
